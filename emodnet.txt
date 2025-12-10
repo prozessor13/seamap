@@ -1,0 +1,11 @@
+# emodnet bathymetry global erstellen
+
+wget https://erddap.emodnet.eu/erddap/files/bathymetry_dtm_2024/EMODnet_bathymetry_2024.nc
+wget https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip
+unzip land-polygons-complete-4326.zip
+
+gdal_translate -a_srs EPSG:4326 NETCDF:"EMODnet_bathymetry_2024.nc":elevation bathymetry_elevation.tif
+gdal_rasterize -burn 0 -init nan -a_nodata nan -tr 0.001041666666666 0.001041666666666 -te -36 15 43 89.999999999933507 -ot Float32 -of GTiff -l land_polygons land-polygons-complete-4326/land_polygons.shp land0.tif
+gdalwarp -overwrite -ot Float32 -srcnodata "nan" -dstnodata "nan" -of GTiff land0.tif bathymetry_elevation.tif merged.tif
+gdal_fillnodata.py -md 5 merged.tif filled.tif
+gdalwarp -overwrite -r bilinear -ts 379200 360000 filled.tif hq.tif
