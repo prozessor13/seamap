@@ -68,12 +68,12 @@ public class Seamark {
       attrs.put("reference", value(tags, "ref"));
     } else if (sf.isPoint() && "tower".equals(value(tags, "man_made"))) {
       attrs.put("type", "landmark");
-      attrs.put("category", "man_made");
+      attrs.put("category", value(tags, "man_made"));  // Use actual value: "tower"
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
     } else if (sf.isPoint() && ("windmill".equals(value(tags, "man_made")) || "gasometer".equals(value(tags, "man_made")))) {
       attrs.put("type", "landmark");
-      attrs.put("category", "man_made");
+      attrs.put("category", value(tags, "man_made"));  // Use actual value: "windmill" or "gasometer"
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
     }
@@ -224,15 +224,41 @@ public class Seamark {
     return sb.toString();
   }
 
+  // Based on https://wiki.openstreetmap.org/wiki/Seamarks/Seamark_Objects
   private static String getSeamarkCategory(Map<String, Object> tags, String type) {
     if ("rock".equals(type)) {
       return seamarkValue(tags, "rock", "water_level");
     } else if ("restricted_area".equals(type)) {
-      return seamarkValue(tags, "restricted_area", "restriction");
+      return coalesce(
+        seamarkValue(tags, "restricted_area", "category"),
+        seamarkValue(tags, "restricted_area", "restriction")
+      );
+    } else if ("seabed_area".equals(type)) {
+      return seamarkValue(tags, "seabed_area", "surface");
+    } else if ("obstruction".equals(type)) {
+      return coalesce(
+        seamarkValue(tags, "obstruction", "category"),
+        seamarkValue(tags, "obstruction", "water_level")
+      );
+    } else if ("wreck".equals(type)) {
+      return seamarkValue(tags, "wreck", "category");
+    } else if ("cable_submarine".equals(type)) {
+      return seamarkValue(tags, "cable_submarine", "category");
+    } else if ("pipeline_submarine".equals(type)) {
+      return coalesce(
+        seamarkValue(tags, "pipeline_submarine", "category"),
+        seamarkValue(tags, "pipeline_submarine", "product")
+      );
+    } else if ("landmark".equals(type)) {
+      return coalesce(
+        seamarkValue(tags, "landmark", "category"),
+        seamarkValue(tags, "landmark", "function")
+      );
+    } else if ("building".equals(type)) {
+      return seamarkValue(tags, "building", "function");
     } else {
       return seamarkValue(tags, type, "category");
     }
   }
-
 
 }

@@ -11,7 +11,7 @@ import com.onthegomap.planetiler.util.LanguageUtils;
 import org.locationtech.jts.geom.*;
 
 /**
- * Seamarks.java
+ * Seamap.java
  *
  * Mapping logic:
  *   • seamark:* objects directly (buoys, beacons, lights, etc.)
@@ -33,15 +33,18 @@ import org.locationtech.jts.geom.*;
  * Note:
  * - For polygons we additionally generate a label with a PointOnSurface equivalent
  */
-public class Seamarks implements Profile {
+public class Seamap implements Profile {
 
   public static void main(String[] args) throws Exception {
     var arguments = Arguments.fromArgsOrConfigFile(args).withDefault("download", true);
     String area = arguments.getString("area", "geofabrik area to download", "monaco");
+    Path dataDir = Path.of("data");
+
     Planetiler.create(arguments)
-      .setProfile(new Seamarks())
-      .addOsmSource("osm", Path.of("data", area + ".osm.pbf"), "geofabrik:" + area)
-      .overwriteOutput(Path.of("data", "seamarks.pmtiles"))
+      .setProfile(new Seamap())
+      .addOsmSource("osm", dataDir.resolve(area + ".osm.pbf"), "geofabrik:" + area)
+      .addShapefileSource("land", LandPolygons.ensureLandPolygons(dataDir))
+      .overwriteOutput(dataDir.resolve("seamarks.pmtiles"))
       .run();
   }
 
@@ -52,6 +55,13 @@ public class Seamarks implements Profile {
 
   @Override
   public void processFeature(SourceFeature sf, FeatureCollector features) {
+    // Process land polygons from shapefile
+    if (!sf.isPoint() && "land".equals(sf.getSource())) {
+      LandPolygons.processLandFeature(sf, features);
+      return;
+    }
+
+    // Process seamarks from OSM
     Map<String, Object> attrs = Seamark.extractSeamarkAttributes(sf);
     String type = (String) attrs.get("type");
     if (type != null) {

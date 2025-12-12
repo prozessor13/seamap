@@ -69,8 +69,15 @@ public class Lights {
         // 2. Create Ray geometries at sector boundaries
         Map<Double, String> angleToRange = new HashMap<>();
         for (Map<String, String> segment : segments.values()) {
-            angleToRange.put(parseDoubleOrDefault(segment.get("sector_start"), 0.0), segment.get("range"));
-            angleToRange.put(parseDoubleOrDefault(segment.get("sector_end"), 360.0), segment.get("range"));
+            String sectorStartStr = segment.get("sector_start");
+            String sectorEndStr = segment.get("sector_end");
+            // Only create rays if sector boundaries are explicitly defined
+            if (sectorStartStr != null) {
+                angleToRange.put(parseDoubleOrDefault(sectorStartStr, 0.0), segment.get("range"));
+            }
+            if (sectorEndStr != null) {
+                angleToRange.put(parseDoubleOrDefault(sectorEndStr, 360.0), segment.get("range"));
+            }
         }
         for (Map.Entry<Double, String> entry : angleToRange.entrySet()) {
             LineString ray = createLightRay(center, entry.getKey(), rayRadius);
