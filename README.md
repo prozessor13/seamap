@@ -1,5 +1,8 @@
 # Seamap.java - Planetiler Profile for Nautical Charts
 
+![Screenshot](sh.png)
+![Split View](split.png)
+
 ## Overview
 This Java file implements a Planetiler profile that converts OpenStreetMap data directly into PMTiles vector tiles for nautical charts. It replaces the previous imposm3 + PostgreSQL workflow.
 
@@ -32,7 +35,50 @@ Maps standard OSM tags to seamark types:
 | `man_made=tower\|windmill\|gasometer` | `landmark` | `man_made` | point |
 | `man_made=lighthouse` | `lighthouse` | - | point (with full light attributes) |
 
-### 3. Places Layer
+### 3. Land Layer
+- Downloads and processes global land polygons from [osmdata.openstreetmap.de](https://osmdata.openstreetmap.de/data/land-polygons.html)
+- Source: `land-polygons-split-4326.zip` (~600 MB)
+- Projection: WGS84 (EPSG:4326)
+- Automatic download on first run if not present
+- Creates `land` layer with polygon features
+- Attributes: None (simple land mask geometry)
+- Buffer: 4 pixels for smooth rendering at tile boundaries
+
+### 4. Light Sector Layer
+Generates geometric representations of light sectors for navigational lights:
+
+#### Light Geometries
+- **Arcs**: Colored sector arcs showing the visible range of each light color
+- **Rays**: Lines at sector boundaries marking the transitions between colors
+
+#### Light Types
+| Type | Arc Radius | Ray Radius |
+|------|------------|------------|
+| `light_major` | 0.7 NM (~1296m) | 2.5 NM (~4630m) |
+| `light_minor` | 0.4 NM (~741m) | 1.2 NM (~2222m) |
+
+#### Attributes
+- `osm_id` (integer) - Reference to parent seamark
+- `type` (string) - Parent seamark type (e.g., `light_major`, `light_minor`)
+- `subtype` (string) - Geometry type: `arc` or `ray`
+- `color` (string) - Light color for arcs (e.g., `red`, `green`, `white`)
+- `range` (string) - Nominal range in nautical miles
+- `sector_start` (integer) - Start bearing in degrees (0-360, for arcs only)
+- `sector_end` (integer) - End bearing in degrees (0-360, for arcs only)
+
+#### Source Tags
+Processes `seamark:light:N:*` tags where N is the sector number:
+- `seamark:light:N:colour` - Light color
+- `seamark:light:N:range` - Nominal range
+- `seamark:light:N:sector_start` - Sector start bearing
+- `seamark:light:N:sector_end` - Sector end bearing
+
+#### Example
+For a lighthouse with red (0-120°) and green (120-240°) sectors:
+- 2 arc features (one red, one green)
+- 4 ray features (at 0°, 120°, 120°, 240°)
+
+### 5. Places Layer
 - Extracts `natural=bay` features
 - Creates point geometry:
   - Points: direct geometry
@@ -40,7 +86,7 @@ Maps standard OSM tags to seamark types:
   - Polygons: point on surface
 - Attributes: `osm_id`, `type`, `subtype`, `name`, `reference`
 
-### 4. Default Values for IALA Maritime Buoyage System
+### 6. Default Values for IALA Maritime Buoyage System
 Implements automatic defaults for standardized seamark types:
 
 #### Cardinal Marks
@@ -72,11 +118,6 @@ Replicates SQL `seamark_light_abbr()` function:
 - Extracts max range per color
 - Example: `Fl(3).WRG.10s15m12M`
 
-### 6. Numeric Value Parsing
-Replicates SQL `to_numeric()` function:
-- Handles European decimal format (comma as decimal separator)
-- Removes thousand separators
-- Strips leading zeros
 
 ## Usage
 
@@ -104,8 +145,7 @@ java -Xmx4g -cp planetiler.jar:. Seamarks \
 
 ## Output Layers
 
-### seamark_point
-Point features for all seamark objects
+### Point/Line/Polygon features for all seamark objects
 
 **Attributes:**
 - `osm_id` (integer)
@@ -123,47 +163,136 @@ Point features for all seamark objects
 - `topmark_color` (string)
 - `topmark_shape` (string)
 
-### seamark_linestring
-Line features for seamark objects (cables, pipelines, fairways, etc.)
+**Note:** Polygon features also generate a corresponding point feature for labeling (using point on surface).
 
-**Attributes:** Same as seamark_point
 
-### seamark_polygon
-Polygon features for areas (harbours, restricted areas, etc.)
 
-**Attributes:** Same as seamark_point
+## Build PMTiles file for the whole planet
 
-**Note:** Polygon features also generate a corresponding point feature in `seamark_point` layer for labeling (using point on surface).
+This command takes about 1h on a strong hetzner machine (Ryzen 9 & 128 GB RAM)
 
-### places
-Named places relevant for nautical charts (bays, harbours, etc.)
+    java -Xmx20g   -XX:+UseParallelGC   -XX:ParallelGCThreads=4   -cp "/app/classes:/app/libs/*:/app/resources:."   Seamap.java   --download   --osm-url=https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf   --maxzoom=14  --output=/data/seamap.pmtiles   --tmp=/data/tmp   --nodemap-type=array   --storage=mmap   --threads=20   --download-threads=10   --http-retries=3   --force
 
-**Attributes:**
-- `osm_id` (integer)
-- `type` (string) - mapping key (e.g., "natural")
-- `subtype` (string) - mapping value (e.g., "bay")
-- `name` (string)
-- `reference` (string)
+## Demo Page (seamap.html)
 
-## Differences from SQL Implementation
+The [seamap.html](seamap.html) file provides a complete MapLibre GL JS demonstration of the nautical chart visualization.
 
-1. **No PostgreSQL dependency**: Direct OSM → PMTiles conversion
-2. **Single-pass processing**: No intermediate tables or UPDATE statements
-3. **Default values**: Applied during feature creation instead of post-processing
-4. **Label points**: Generated automatically for polygons using Planetiler's built-in methods
+### Data Sources
 
-## TODOs / Future Enhancements
+#### 1. Base Map
+- **Provider**: [VersaTiles](https://tiles.versatiles.org)
+- **Style**: Colorful style with desaturated colors (-30% saturation)
+- **Purpose**: Base map with streets, labels, and general cartography
 
-1. Add support for additional place types (harbours, anchorages as places)
-2. Implement zoom-level specific filtering
-3. Add minzoom attributes for feature visibility optimization
-4. Consider adding depth contours, soundings, land polygons as separate layers
+#### 2. Seamark Vector Tiles
+- **Source**: MapToolkit Data Connector
+- **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf`
+- **Format**: Vector tiles (PMTiles served via API)
+- **Max Zoom**: 14
+- **Layers**:
+  - `seamark` - All nautical features (buoys, beacons, lights, etc.)
+  - `land` - Land polygons for coastline
+  - `light` - Light sector geometries (arcs and rays)
 
-## Validation
+#### 3. Seamark Sprites
+- **Source**: MapToolkit Icons
+- **Endpoint**: `http://icons.maptoolkit.net/seamap`
+- **Format**: Sprite sheets with S-57 nautical symbols
+- **Purpose**: Icon rendering for buoys, beacons, landmarks, etc.
 
-The implementation has been verified against:
-- `sql/seamarks.sql` - SQL logic for seamark processing
-- `sql/places.sql` - Places extraction logic
-- `imposm3/seamarks.yaml` - Input table definitions
+#### 4. Land Hillshading & Contours
+- **Provider**: [Mapterhorn](https://tiles.mapterhorn.com)
+- **Endpoint**: `https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`
+- **Encoding**: Terrarium (RGB-encoded elevation)
+- **Max Zoom**: 12
+- **Features**:
+  - Hillshading with 0.2 exaggeration
+  - Dynamically generated contour lines
+  - Contour intervals: 200m/1000m (z7), 100m/500m (z8-9), 50m/200m (z10), 20m/100m (z11), 10m/50m (z12)
 
-All transformations, default values, and attribute mappings match the original SQL implementation.
+#### 5. Bathymetry (EMODnet)
+- **Source**: MapToolkit Data Connector (EMODnet Bathymetry 2024)
+- **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.png`
+- **Encoding**: Terrarium (RGB-encoded depth values)
+- **Max Zoom**: 11
+- **Coverage**: European waters
+- **Features**:
+  - Bathymetric hillshading (0.2 exaggeration)
+  - Dynamically generated depth contours
+  - Contour lines at: 0m, 2m, 5m, 10m, 20m, 50m, 100m, 250m, 500m, 1000m, 2000m, 3000m, 4000m, 5000m
+  - Depth area fills: 0-2m, 2-5m, 5-10m, 10-20m, 20-50m
+  - Spot soundings (depth labels) with 32-pixel grid spacing
+
+### Technology Stack
+
+- **MapLibre GL JS**: Open-source map rendering engine
+- **maplibre-contour** (v0.2.8): Plugin for dynamic contour generation from DEM tiles
+- **VersaTiles Style**: Base map styling library
+
+### Features Rendered
+
+The demo visualizes:
+- **Bathymetry**: Colored depth zones with contours and soundings
+- **Land**: Coastline with terrain hillshading and elevation contours
+- **Seamarks**: Buoys, beacons, lights with IALA colors and symbols
+- **Light Sectors**: Colored arcs and rays showing navigational light coverage
+- **Navigation**: Traffic separation schemes, fairways, anchorages
+- **Hazards**: Rocks, wrecks with appropriate symbols
+- **Infrastructure**: Cables, pipelines, platforms, landmarks
+
+## Create EMODnet Bathymetry
+
+### Download data
+
+Download EMODnet bathymetry dataset (NetCDF format with elevation data for European waters)
+
+    wget https://erddap.emodnet.eu/erddap/files/bathymetry_dtm_2024/EMODnet_bathymetry_2024.nc
+
+Download OSM land polygons (global coastline shapefile in WGS84)
+
+    wget https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip
+    unzip land-polygons-complete-4326.zip
+
+### Process bathymetry data
+
+1. Extract elevation layer from NetCDF and convert to GeoTIFF
+    - Assigns WGS84 coordinate system (EPSG:4326)
+    - Converts from NetCDF format to standard GeoTIFF raster
+```
+gdal_translate -a_srs EPSG:4326 NETCDF:"EMODnet_bathymetry_2024.nc":elevation bathymetry_elevation.tif
+```
+
+2. Rasterize land polygons to mask land areas
+   - burn 0: Set land pixels to elevation 0 (sea level)
+   - init nan: Initialize all pixels as NaN (no data)
+   - tr: Target resolution ~0.00104° (~115m at equator, matching EMODnet resolution)
+   - te: Extent covering Europe (-36°W to 43°E, 15°N to 90°N)
+   - ot Float32: Output as 32-bit floating point for precise elevation values
+```
+gdal_rasterize -burn 0 -init nan -a_nodata nan -tr 0.001041666666666 0.001041666666666 -te -36 15 43 89.999999999933507 -ot Float32 -of GTiff -l land_polygons land-polygons-complete-4326/land_polygons.shp land0.tif
+```
+
+3. Merge land mask with bathymetry data
+   - Overlays land0.tif (land=0) onto bathymetry_elevation.tif (ocean depths)
+   - Preserves NaN values where no data exists in either source
+   - Result: Combined raster with land at 0m and bathymetry for sea areas
+```
+gdalwarp -overwrite -ot Float32 -srcnodata "nan" -dstnodata "nan" -of GTiff land0.tif bathymetry_elevation.tif merged.tif
+```
+
+4. Fill small gaps in data using interpolation
+   - md 5: Maximum distance of 5 pixels to search for valid values
+   - Interpolates missing data (NaN) using surrounding valid pixels
+   - Creates seamless bathymetry raster without gaps
+```
+gdal_fillnodata.py -md 5 merged.tif filled.tif
+```
+
+5. Create raster-dem tiles
+
+This command takes about 10h on a strong Hetzner machine
+
+```
+rio rgbify -v -e terrarium --min-z 3 --max-z 11 -r -2 -j 4 --format webp filled_clipped.vrt emod.mbtiles
+pmtiles convert emod.mbtiles emod.pmtiles
+```
