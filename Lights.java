@@ -108,23 +108,21 @@ public class Lights {
     }
 
     private static LineString createLightArc(Point center, int from, int to, double radiusMeters) {
-        from += 90;
-        to += 90;
         while (to < from) to += 360;
         List<Coordinate> coords = new ArrayList<>();
         for (double d = from; d <= to; d += 0.1) {
-            double rad = Math.toRadians(-d);
-            double x = center.getX() + radiusMeters / WORLD_WIDTH_METERS * Math.cos(rad);
-            double y = center.getY() + radiusMeters / WORLD_WIDTH_METERS * Math.sin(rad);
+            double rad = Math.toRadians(d);
+            double x = center.getX() - radiusMeters / WORLD_WIDTH_METERS * Math.sin(rad);
+            double y = center.getY() + radiusMeters / WORLD_WIDTH_METERS * Math.cos(rad);
             coords.add(new Coordinate(x, y));
         }
         return GEOMETRY_FACTORY.createLineString(coords.toArray(new Coordinate[0]));
     }
 
     private static LineString createLightRay(Point center, double deg, double radiusMeters) {
-        double rad = Math.toRadians(-(deg + 90));
-        double x = center.getX() + radiusMeters / WORLD_WIDTH_METERS * Math.cos(rad);
-        double y = center.getY() + radiusMeters / WORLD_WIDTH_METERS * Math.sin(rad);
+        double rad = Math.toRadians(deg);
+        double x = center.getX() - radiusMeters / WORLD_WIDTH_METERS * Math.sin(rad);
+        double y = center.getY() + radiusMeters / WORLD_WIDTH_METERS * Math.cos(rad);
         Coordinate[] coords = new Coordinate[] { center.getCoordinate(), new Coordinate(x, y) };
         return GEOMETRY_FACTORY.createLineString(coords);
     }
