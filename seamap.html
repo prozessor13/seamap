@@ -47,9 +47,9 @@
 	<div class="bathymetry-control">
 		<label>Bathymetry:</label>
 		<select id="bathymetry-select">
-			<option value="emod">EMODnet</option>
+			<option value="emod" selected>EMODnet</option>
 			<option value="gebco">GEBCO</option>
-			<option value="ddm" selected>DDM</option>
+			<option value="ddm">DDM</option>
 		</select>
 	</div>
 
@@ -171,7 +171,7 @@
         };
         // Get bathymetry from URL parameter or default to 'ddm'
         const urlParams = new URLSearchParams(window.location.search);
-        const selectedBathymetry = urlParams.get('bathymetry') || 'ddm';
+        const selectedBathymetry = urlParams.get('bathymetry') || 'emod';
         setBathymetry(selectedBathymetry);
         // Update dropdown to match
         document.getElementById('bathymetry-select').value = selectedBathymetry;
