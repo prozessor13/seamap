@@ -16,6 +16,43 @@
 	<!-- Define the map container -->
 	<div id="map" style="height: 100vh"></div>
 
+	<!-- Bathymetry control -->
+	<style>
+		.bathymetry-control {
+			position: absolute;
+			top: 10px;
+			right: 10px;
+			background: white;
+			padding: 10px;
+			border-radius: 4px;
+			box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+			font-family: 'Open Sans', sans-serif;
+			z-index: 1;
+		}
+		.bathymetry-control label {
+			display: block;
+			margin-bottom: 5px;
+			font-weight: bold;
+			font-size: 12px;
+		}
+		.bathymetry-control select {
+			width: 100%;
+			padding: 5px;
+			border: 1px solid #ccc;
+			border-radius: 3px;
+			font-size: 12px;
+			cursor: pointer;
+		}
+	</style>
+	<div class="bathymetry-control">
+		<label>Bathymetry:</label>
+		<select id="bathymetry-select">
+			<option value="emod">EMODnet</option>
+			<option value="gebco">GEBCO</option>
+			<option value="ddm" selected>DDM</option>
+		</select>
+	</div>
+
 	<!-- Initialize the map -->
 	<script>
 		const style = VersaTilesStyle.colorful({
@@ -33,11 +70,13 @@
         style.sources.seamap = {
             type: 'vector',
             tiles: [ "https://dataconnector.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf?api_key=seamap"],
+            attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank">© OSM</a>',
             maxzoom: 14,
         };
         // add mapterhorn hillshading & contour sources
         var demSource = new mlcontour.DemSource({
             url: 'https://tiles.mapterhorn.com/{z}/{x}/{y}.webp',
+            attribution: '<a href="https://mapterhorn.com/attribution" target="_blank">© Mapterhorn</a>',
             encoding: "terrarium",
             maxzoom: 12,
             cacheSize: 100,
@@ -70,44 +109,72 @@
         };
 
         // add maptoolkit emod bathymetry source
-        var bathymetrySource = new mlcontour.DemSource({
-            url: 'https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.png?api_key=seamap',
-            encoding: "terrarium",
-            maxzoom: 11,
-            cacheSize: 100,
-        });
-        bathymetrySource.setupMaplibre(maplibregl);
-        style.sources.bathymetryshading = {
-            type: 'raster-dem',
-            tiles: [bathymetrySource.sharedDemProtocolUrl],
-            encoding: "terrarium",
-            tileSize: 512,
-            maxzoom: 9
+
+        var bathymetrySource = {
+            emod: new mlcontour.DemSource({
+                url: 'https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.webp?api_key=seamap',
+                attribution: '<a href="https://emodnet.ec.europa.eu" target="_blank">© EMODnet</a>',
+                encoding: "terrarium",
+                maxzoom: 11,
+                cacheSize: 100,
+            }),
+            gebco: new mlcontour.DemSource({
+                url: 'https://dataconnector.maptoolkit.net/seamap/gebco/{z}/{x}/{y}.webp?api_key=seamap',
+                attribution: '<a href="https://www.gebco.net" target="_blank">© GEBCO</a>',
+                encoding: "terrarium",
+                maxzoom: 9,
+                cacheSize: 100,
+            }),
+            ddm: new mlcontour.DemSource({
+                url: 'https://dataconnector.maptoolkit.net/seamap/ddm/{z}/{x}/{y}.webp?api_key=seamap',
+                attribution: '<a href="https://sdfi.dk" target="_blank">© SDFI</a>',
+                encoding: "terrarium",
+                maxzoom: 12,
+                cacheSize: 100,
+            }),
         };
-        style.sources.bathymetry = {
-            type: 'vector',
-            tiles: [
-                bathymetrySource.contourProtocolUrl({
-                    multiplier: -1,
-                    contourLayer: "contours",
-                    lineLevels: {
-                        5: [0, 2, 5, 10, 20, 50, 100, 250, 500, 1000, 2000, 3000, 4000, 5000],
-                    },
-                    elevationKey: "ele",
-                    levelKey: "level",
-                    polygonLayer: "bathymetry",
-                    lowerElevationKey: "min",
-                    upperElevationKey: "max",
-                    polygonLevels: {
-                        5: [-100000, 0, 2, 5, 10, 20, 50],
-                    },
-                    spotGridSpacing: 32,
-                    spotSortOrder: "asc",
-                    spotLayer: "soundings"
-                })
-            ],
-            maxzoom: 15
+        bathymetrySource.emod.setupMaplibre(maplibregl);
+        bathymetrySource.gebco.setupMaplibre(maplibregl);
+        bathymetrySource.ddm.setupMaplibre(maplibregl);
+        window.setBathymetry = (name) => {
+            style.sources.bathymetryshading = {
+                type: 'raster-dem',
+                tiles: [bathymetrySource[name].sharedDemProtocolUrl],
+                encoding: "terrarium",
+                tileSize: 512,
+                maxzoom: 9
+            };
+            style.sources.bathymetry = {
+                type: 'vector',
+                tiles: [
+                    bathymetrySource[name].contourProtocolUrl({
+                        multiplier: name == 'ddm' ? 1 : -1,
+                        contourLayer: "contours",
+                        lineLevels: {
+                            5: [0, 2, 5, 10, 20, 50, 100, 250, 500, 1000, 2000, 3000, 4000, 5000],
+                        },
+                        elevationKey: "ele",
+                        levelKey: "level",
+                        polygonLayer: "bathymetry",
+                        lowerElevationKey: "min",
+                        upperElevationKey: "max",
+                        polygonLevels: {
+                            5: [-100000, 0, 2, 5, 10, 20, 50],
+                        },
+                        spotGridSpacing: 32,
+                        spotSortOrder: "asc",
+                        spotLayer: "soundings"
+                    })
+                ],
+                maxzoom: 15
+            };
         };
+        // Get bathymetry from URL parameter or default to 'ddm'
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedBathymetry = urlParams.get('bathymetry') || 'ddm';
+        setBathymetry(selectedBathymetry);
+        // Update dropdown to match
+        document.getElementById('bathymetry-select').value = selectedBathymetry;
 
         // draw sea
         style.layers.splice(0, 2, {
@@ -677,8 +744,18 @@
 		// start the map with the generated VersaTiles style
 		var map = new maplibregl.Map({
             hash: true,
+            center: [10.2351, 56.16858],
+            zoom: 13.4,
 			container: 'map',
 			style
+		});
+
+		// Add event listener for bathymetry selection
+		document.getElementById('bathymetry-select').addEventListener('change', function(e) {
+			const selectedBathymetry = e.target.value;
+			const url = new URL(window.location);
+			url.searchParams.set('bathymetry', selectedBathymetry);
+			window.location = url;
 		});
 	</script>
 </body>
