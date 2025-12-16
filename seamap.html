@@ -69,7 +69,7 @@
         // add maptoolkit seamap source
         style.sources.seamap = {
             type: 'vector',
-            tiles: [ "https://dataconnector.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf?api_key=seamap"],
+            tiles: ["https://dataconnector-cdn.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf?api_key=seamap"],
             attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank">© OSM</a>',
             maxzoom: 14,
         };
@@ -112,21 +112,21 @@
 
         var bathymetrySource = {
             emod: new mlcontour.DemSource({
-                url: 'https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.webp?api_key=seamap',
+                url: 'https://dataconnector-cdn-3.maptoolkit.net/seamap/emod/{z}/{x}/{y}.webp?api_key=seamap',
                 attribution: '<a href="https://emodnet.ec.europa.eu" target="_blank">© EMODnet</a>',
                 encoding: "terrarium",
                 maxzoom: 11,
                 cacheSize: 100,
             }),
             gebco: new mlcontour.DemSource({
-                url: 'https://dataconnector.maptoolkit.net/seamap/gebco/{z}/{x}/{y}.webp?api_key=seamap',
+                url: 'https://dataconnector-cdn-3.maptoolkit.net/seamap/gebco/{z}/{x}/{y}.webp?api_key=seamap',
                 attribution: '<a href="https://www.gebco.net" target="_blank">© GEBCO</a>',
                 encoding: "terrarium",
                 maxzoom: 9,
                 cacheSize: 100,
             }),
             ddm: new mlcontour.DemSource({
-                url: 'https://dataconnector.maptoolkit.net/seamap/ddm/{z}/{x}/{y}.webp?api_key=seamap',
+                url: 'https://dataconnector-cdn-3.maptoolkit.net/seamap/ddm/{z}/{x}/{y}.webp?api_key=seamap',
                 attribution: '<a href="https://sdfi.dk" target="_blank">© SDFI</a>',
                 encoding: "terrarium",
                 maxzoom: 12,
@@ -140,6 +140,11 @@
             style.sources.bathymetryshading = {
                 type: 'raster-dem',
                 tiles: [bathymetrySource[name].sharedDemProtocolUrl],
+                attribution: name == 'emod'
+                    ? '<a href="https://emodnet.ec.europa.eu" target="_blank">© EMODnet</a>'
+                    : name == 'ddm'
+                        ? '<a href="https://sdfi.dk" target="_blank">© SDFI</a>'
+                        : '<a href="https://www.gebco.net" target="_blank">© GEBCO</a>',
                 encoding: "terrarium",
                 tileSize: 512,
                 maxzoom: 9
@@ -186,6 +191,7 @@
             "type": "fill",
             "source": "bathymetry",
             "source-layer": "bathymetry",
+            "minzoom": 8,
             "paint": {
                 "fill-antialias": false,
                 "fill-color": ["match", ["get", "max"],
@@ -200,11 +206,30 @@
             },
             "layout": { "fill-sort-key": ["*", ["get", "max"], -1] }
         }, {
+            "id": "bathymetry-relief",
+            "type": "color-relief",
+            "source": "bathymetryshading",
+            "maxzoom": 8,
+            "paint": {
+                "color-relief-color": [
+                    "interpolate",
+                    ["linear"],
+                    ["elevation"],
+                    -10000, "#bae7fe", -50.1, "#e9f7ff",
+                    -50, "#bae7fe", -20.1, "#bae7fe",
+                    -20, "#9adcfe", -10.1, "#9adcfe",
+                    -10, "#83d4fe", -5.1, "#83d4fe",
+                    -5, "#73cefe", -2.1, "#73cefe",
+                    -2, "#68cafe", -0.01, "#68cafe",
+                    0, "#cadbc1",
+                ],
+            }
+        }, {
             "id": 'bathymetryshading',
             "type": 'hillshade',
             "source": 'bathymetryshading',
             "paint": {
-                'hillshade-exaggeration': 0.2,
+                'hillshade-exaggeration': 0.14,
                 'hillshade-method': 'combined'
             }
         }, {
@@ -235,6 +260,7 @@
             "id": "bathymetry_contours",
             "type": "line",
             "source": "bathymetry",
+            "minzoom": 5,
             "source-layer": "contours",
             "paint": {"line-color": "#777", "line-width": 0.5, "line-opacity": 0.5}
         }, {
