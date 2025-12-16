@@ -511,7 +511,7 @@
             "source": "seamap",
             "source-layer": "light",
             "type": "line",
-            "filter": ["all", ["==", "type", "light_minor"], ["==", "subtype", "ray"]],
+            "filter": ["==", ["get", "subtype"], "ray"],
             "minzoom": 5,
             "layout": {
                 "line-cap": "round",
@@ -528,7 +528,7 @@
             "source": "seamap",
             "source-layer": "light",
             "type": "line",
-            "filter": ["all", ["==", "type", "light_minor"], ["==", "subtype", "arc"]],
+            "filter": ["==", ["get", "subtype"], "arc"],
             "minzoom": 5,
             "layout": {
                 "line-cap": "round",
@@ -606,7 +606,7 @@
             "source": "seamap",
             "source-layer": "seamark",
             "type": "symbol",
-            "filter": ["==", "type", "light_minor"],
+            "filter": ["in", ["get", "type"], ["literal", ["light_minor", "light_major"]]],
             "minzoom": 7,
             "layout": {
                 "icon-allow-overlap": true,
@@ -694,6 +694,7 @@
                     ["==", ["get", "shape"], "conical"], ["literal", [-3, -40]],
                     ["in", "beacon", ["get", "type"]], ["literal", [0, -112]],
                     ["==", ["get", "type"], "light_minor"], ["literal", [0, -32]],
+                    ["==", ["get", "type"], "light_mayor"], ["literal", [0, -32]],
                     ["literal", [-4, -74]]
                 ],
                 "icon-rotate": [ "case", ["in", "buoy", ["get", "type"]], 20, ["in", "pillar", ["get", "shape"]], 20, 0],
