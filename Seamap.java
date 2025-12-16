@@ -65,10 +65,20 @@ public class Seamap implements Profile {
     Map<String, Object> attrs = Seamark.extractSeamarkAttributes(sf);
     String type = (String) attrs.get("type");
     if (type != null) {
+      boolean isLightMajor = "light_major".equals(type);
+      boolean isLightMinor = "light_minor".equals(type);
+
       // add seamark to vector tile
       attrs.put("osm_id", sf.id());
       FeatureCollector.Feature feature = features.anyGeometry("seamark");
       attrs.forEach((k, v) -> feature.setAttr(k, v));
+
+      // Set zoom range based on type:
+      if (isLightMajor || isLightMinor) {
+        feature.setMinZoom(6);
+      } else {
+        feature.setMinZoom(8);
+      }
 
       // add sector-lights (Arcs und Rays) to vector tile
       if (sf.tags().containsKey("seamark:light:1:colour")) {
@@ -79,6 +89,13 @@ public class Seamap implements Profile {
             lightFeature.setAttr("osm_id", sf.id());
             lightFeature.setAttr("type", type);
             lightGeom.attrs.forEach((k, v) -> lightFeature.setAttr(k, v));
+
+            // Light sectors follow the same zoom logic as their parent seamark
+            if (isLightMajor || isLightMinor) {
+              lightFeature.setMinZoom(6);
+            } else {
+              lightFeature.setMinZoom(8);
+            }
           }
         } catch (Exception e) {
           System.err.println("Error generating light geometries for OSM ID " + sf.id() + ": " + e);
