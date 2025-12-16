@@ -153,6 +153,7 @@
                 type: 'vector',
                 tiles: [
                     bathymetrySource[name].contourProtocolUrl({
+                        overzoom: 1,
                         multiplier: name == 'ddm' ? 1 : -1,
                         contourLayer: "contours",
                         lineLevels: {
@@ -323,7 +324,7 @@
             "source": "seamap",
             "source-layer": "land",
             "type": "line",
-            "paint": {"line-color": "#3d3d3d", "line-width": 2, "line-opacity": 0.8}
+            "paint": {"line-color": "#3d3d3d", "line-width": 3, "line-opacity": 0.8}
         }, {
             "id": "land_area",
             "source": "seamap",
