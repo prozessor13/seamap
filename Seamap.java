@@ -40,7 +40,7 @@ public class Seamap implements Profile {
     String area = arguments.getString("area", "geofabrik area to download", "monaco");
     Path dataDir = Path.of("data");
 
-    Seamark.depthCalculator = new DepthCalculator("depth.pmtiles");
+    Seamark.depthCalculator = new DepthCalculator(dataDir.resolve("depth.pmtiles"));
 
     Planetiler.create(arguments)
       .setProfile(new Seamap())
@@ -67,8 +67,29 @@ public class Seamap implements Profile {
     Map<String, Object> attrs = Seamark.extractSeamarkAttributes(sf);
     String type = (String) attrs.get("type");
     if (type != null) {
-      boolean isLightMajor = "light_major".equals(type);
-      boolean isLightMinor = "light_minor".equals(type);
+      boolean isLightMajor = type.equals("light_major");
+      boolean isLightMinor = type.equals("light_minor");
+      boolean isSeparationZone = type.startsWith("separation_");
+      boolean isPlatform = type.equals("platform");
+      boolean isSafeWater = type.contains("_safe_water");
+      boolean isIsoltedDanger = type.contains("_isolated_danger");
+      boolean isCardinal = type.contains("_cardinal");
+      boolean isFogSignal = type.equals("fog_signal");
+      boolean isRestricted = Arrays.asList(
+        "anchorage",
+        "cable_area",
+        "fairway",
+        "inshore_traffic_zone",
+        "marine_farm",
+        "military_area",
+        "protected_area",
+        "restricted_area",
+        "production_area",
+        "pipeline_area",
+        "precautionary_area",
+        "seaplane_landing_area",
+        "submarine_transit_lane"
+      ).contains(type);
 
       // add seamark to vector tile
       attrs.put("osm_id", sf.id());
@@ -76,10 +97,48 @@ public class Seamap implements Profile {
       attrs.forEach((k, v) -> feature.setAttr(k, v));
 
       // Set zoom range based on type:
-      if (isLightMajor || isLightMinor) {
+      if (isLightMajor || isLightMinor || isSeparationZone || isRestricted || isPlatform || isFogSignal) {
+        feature.setMinZoom(4);
+      } else if (isSafeWater || isIsoltedDanger || isCardinal) {
         feature.setMinZoom(6);
       } else {
         feature.setMinZoom(8);
+      }
+
+      // create label-grid for rocks, sorted by danger level
+      if (type.equals("rock")) {
+        String category = (String) attrs.get("category");
+        int depth = attrs.get("depth") != null ? Math.round(((Number) attrs.get("depth")).floatValue()) : 0;
+        int rank;
+        if ("submerged".equals(category)) {
+          rank = 0; // Most dangerous: always underwater, invisible
+        } else if ("awash".equals(category)) {
+          rank = 10000; // Very dangerous: at wave height, barely visible
+        } else if ("covers".equals(category)) {
+          rank = 20000; // Dangerous: periodically submerged
+        } else {
+          rank = 30000; // Least dangerous: always visible (dry, always_dry, or no water_level)
+        }
+        feature.setSortKey(rank + depth).setPointLabelGridSizeAndLimit(12, 32, 4);
+      }
+
+      // create label-grid for wrecks, sorted by danger level
+      if (type.equals("wreck")) {
+        String category = (String) attrs.get("category");
+        int depth = attrs.get("depth") != null ? Math.round(((Number) attrs.get("depth")).floatValue()) : 0;
+        int rank;
+        if ("dangerous".equals(category)) {
+          rank = 0; // Most dangerous: dangerous to surface navigation
+        } else if ("mast_showing".equals(category)) {
+          rank = 10000; // Very dangerous: mast visible
+        } else if ("hull_showing".equals(category)) {
+          rank = 20000; // Dangerous: hull or superstructure visible
+        } else if ("distributed_remains".equals(category)) {
+          rank = 30000; // Moderately dangerous: foul ground
+        } else {
+          rank = 40000; // Least dangerous: non-dangerous or unspecified
+        }
+        feature.setSortKey(rank + depth).setPointLabelGridSizeAndLimit(12, 16, 1);
       }
 
       // add sector-lights (Arcs und Rays) to vector tile

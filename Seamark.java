@@ -129,7 +129,7 @@ public class Seamark {
     if (attrs.get("shape") != null && "pile".equals(attrs.get("shape").toString())) attrs.put("shape", "buoyant");
     if (attrs.get("color") != null && attrs.get("color").toString().contains("_")) attrs.put("color_pattern", coalesceObj(attrs.get("color_pattern"), "horizontal"));
 
-    // rocks/wrecks: fill missing depth values and calculate rank
+    // rocks/wrecks: fill missing depth values
     if (("wreck".equals(type) || "rock".equals(type)) && attrs.get("depth") == null) {
       try {
         org.locationtech.jts.geom.Point centroid = (org.locationtech.jts.geom.Point) sf.centroid();
@@ -137,9 +137,7 @@ public class Seamark {
           Coordinate coord = centroid.getCoordinate();
           attrs.put("depth", depthCalculator.getDepthAtLocation(coord));
         }
-      } finally {
-
-      }
+      } catch(Exception e) {}
     }
 
     return attrs;
@@ -254,7 +252,16 @@ public class Seamark {
         seamarkValue(tags, "obstruction", "water_level")
       );
     } else if ("wreck".equals(type)) {
-      return seamarkValue(tags, "wreck", "category");
+      String category = seamarkValue(tags, "wreck", "category");
+      if (category == null) { // Fallback: derive category from water_level if category is not set
+        String waterLevel = seamarkValue(tags, "wreck", "water_level");
+        if ("submerged".equals(waterLevel) || "awash".equals(waterLevel) || "covers".equals(waterLevel)) {
+          category = "dangerous";
+        } else if ("always_dry".equals(waterLevel) || "dry".equals(waterLevel)) {
+          category = "hull_showing";
+        }
+      }
+      return category;
     } else if ("cable_submarine".equals(type)) {
       return seamarkValue(tags, "cable_submarine", "category");
     } else if ("pipeline_submarine".equals(type)) {

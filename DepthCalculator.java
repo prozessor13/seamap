@@ -32,8 +32,8 @@ public class DepthCalculator {
    *
    * @param fname Path to bathymetry PMTiles file
    */
-  public DepthCalculator(String fname, int tileSize) throws IOException {
-    ReadablePmtiles pm = (ReadablePmtiles) ReadablePmtiles.newReadFromFile(Path.of(fname));
+  public DepthCalculator(Path path, int tileSize) throws IOException {
+    ReadablePmtiles pm = (ReadablePmtiles) ReadablePmtiles.newReadFromFile(path);
     this.pmtiles = pm;
     this.maxZoom = pm.getHeader().maxZoom();
     this.tileSize = tileSize;
@@ -47,8 +47,8 @@ public class DepthCalculator {
     };
   }
 
-  public DepthCalculator(String fname) throws IOException {
-    this(fname, 512);
+  public DepthCalculator(Path path) throws IOException {
+    this(path, 512);
   }
 
   /**
