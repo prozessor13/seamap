@@ -1,9 +1,12 @@
 import java.util.*;
 import com.onthegomap.planetiler.util.Parse;
 import com.onthegomap.planetiler.reader.SourceFeature;
+import org.locationtech.jts.geom.Coordinate;
 import java.util.regex.*;
 
 public class Seamark {
+
+  public static DepthCalculator depthCalculator = null;
 
   /**
    * Extracts all light geometries (Arcs + Rays) from OSM tags.
@@ -31,6 +34,9 @@ public class Seamark {
       attrs.put("light_sequence", coalesce(seamarkValue(tags, "light", "sequence"), seamarkValue(tags, "light", "1:sequence")));
       attrs.put("topmark_color", replaceSemiWithUnderscore(coalesce(seamarkValue(tags, "topmark", "colour"), seamarkValue(tags, "daymark", "colour"))));
       attrs.put("topmark_shape", sanitizeTopmarkShape(coalesce(seamarkValue(tags, "topmark", "shape"), seamarkValue(tags, "daymark", "shape"))));
+      attrs.put("depth", Parse.parseDoubleOrNull(coalesce(seamarkValue(tags, type, "depth"), value(tags, "seamark:depth"), value(tags, "depth"))));
+      attrs.put("minimum_depth", Parse.parseDoubleOrNull(coalesce(seamarkValue(tags, type, "minimum_depth"), value(tags, "seamark:minimum_depth"), value(tags, "minimum_depth"))));
+      attrs.put("maximum_depth", Parse.parseDoubleOrNull(coalesce(seamarkValue(tags, type, "maximum_depth"), value(tags, "seamark:maximum_depth"), value(tags, "maximum_depth"))));
 
     // create semarks from normal OSM tags:
     } else if ("ferry".equals(value(tags, "route")) && sf.canBeLine()) {
@@ -66,14 +72,9 @@ public class Seamark {
       attrs.put("category", value(tags, "leisure"));
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
-    } else if (sf.isPoint() && "tower".equals(value(tags, "man_made"))) {
+    } else if (sf.isPoint() && ("tower".equals(value(tags, "man_made")) || "windmill".equals(value(tags, "man_made")) || "gasometer".equals(value(tags, "man_made")))) {
       attrs.put("type", "landmark");
-      attrs.put("category", value(tags, "man_made"));  // Use actual value: "tower"
-      attrs.put("name", value(tags, "name"));
-      attrs.put("reference", value(tags, "ref"));
-    } else if (sf.isPoint() && ("windmill".equals(value(tags, "man_made")) || "gasometer".equals(value(tags, "man_made")))) {
-      attrs.put("type", "landmark");
-      attrs.put("category", value(tags, "man_made"));  // Use actual value: "windmill" or "gasometer"
+      attrs.put("category", value(tags, "man_made"));
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
     }
@@ -128,6 +129,19 @@ public class Seamark {
     if (attrs.get("shape") != null && "pile".equals(attrs.get("shape").toString())) attrs.put("shape", "buoyant");
     if (attrs.get("color") != null && attrs.get("color").toString().contains("_")) attrs.put("color_pattern", coalesceObj(attrs.get("color_pattern"), "horizontal"));
 
+    // rocks/wrecks: fill missing depth values and calculate rank
+    if (("wreck".equals(type) || "rock".equals(type)) && attrs.get("depth") == null) {
+      try {
+        org.locationtech.jts.geom.Point centroid = (org.locationtech.jts.geom.Point) sf.centroid();
+        if (depthCalculator != null && centroid != null) {
+          Coordinate coord = centroid.getCoordinate();
+          attrs.put("depth", depthCalculator.getDepthAtLocation(coord));
+        }
+      } finally {
+
+      }
+    }
+
     return attrs;
   }
 
@@ -150,7 +164,6 @@ public class Seamark {
     return null;
   }
 
-  /** Coalesce over Objects, returning first non-null/non-empty string. */
   private static String coalesceObj(Object... vals) {
     for (Object o : vals) {
       if (o == null) continue;

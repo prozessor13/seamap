@@ -40,6 +40,8 @@ public class Seamap implements Profile {
     String area = arguments.getString("area", "geofabrik area to download", "monaco");
     Path dataDir = Path.of("data");
 
+    Seamark.depthCalculator = new DepthCalculator("depth.pmtiles");
+
     Planetiler.create(arguments)
       .setProfile(new Seamap())
       .addOsmSource("osm", dataDir.resolve(area + ".osm.pbf"), "geofabrik:" + area)
