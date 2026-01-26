@@ -121,14 +121,22 @@ Replicates SQL `seamark_light_abbr()` function:
 
 ## Usage
 
+### Download Planetiler
+
+Download the latest [Planetiler](https://github.com/onthegomap/planetiler):
+
+```bash
+wget https://github.com/onthegomap/planetiler/releases/latest/download/planetiler.jar
+```
+
 ### Compile
 ```bash
-javac -cp planetiler.jar Seamap.java
+javac -cp planetiler.jar *.java
 ```
 
 ### Run
 ```bash
-java -Xmx4g -cp planetiler.jar:. Seamarks \
+java -Xmx4g -cp planetiler.jar:. Seamap \
   --download \
   --area=austria \
   --output=seamarks.pmtiles \
@@ -137,7 +145,7 @@ java -Xmx4g -cp planetiler.jar:. Seamarks \
 
 Or for a local OSM file:
 ```bash
-java -Xmx4g -cp planetiler.jar:. Seamarks \
+java -Xmx4g -cp planetiler.jar:. Seamap \
   --osm-path=data/austria.osm.pbf \
   --output=seamarks.pmtiles \
   --force
