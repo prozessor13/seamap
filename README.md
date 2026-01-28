@@ -4,7 +4,10 @@
 ![Split View](split.png)
 
 ## Overview
-This Java file implements a Planetiler profile that converts OpenStreetMap data directly into PMTiles vector tiles for nautical charts. It replaces the previous imposm3 + PostgreSQL workflow.
+This Java file implements a Planetiler profile that converts OpenStreetMap data directly into PMTiles vector tiles for nautical charts.
+Additionally all Bathymetry/Contours/Spotsoundings are rendered ondemand via a pached version of the [maplibre-contour](https://github.com/prozessor13/maplibre-contour) plugin.
+
+To simplify installation there is a (in very alpha stage) signalk-plugin to allow partial downloads of all map source for offline-usage.
 
 ## Features
 
@@ -130,7 +133,7 @@ javac -cp planetiler.jar Seamap.java
 ```bash
 java -Xmx4g -cp planetiler.jar:. Seamarks \
   --download \
-  --area=austria \
+  --area=croatia \
   --output=seamarks.pmtiles \
   --force
 ```
@@ -175,7 +178,7 @@ This command takes about 1h on a strong hetzner machine (Ryzen 9 & 128 GB RAM)
 
 ## Demo Page (seamap.html)
 
-The [seamap.html](seamap.html) file provides a complete MapLibre GL JS demonstration of the nautical chart visualization.
+The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/-5.3433) file provides a complete MapLibre GL JS demonstration of the nautical chart visualization.
 
 ### Data Sources
 
@@ -187,6 +190,7 @@ The [seamap.html](seamap.html) file provides a complete MapLibre GL JS demonstra
 #### 2. Seamark Vector Tiles
 - **Source**: MapToolkit Data Connector
 - **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf`
+- **Pmtiles Source**: `https://fsn1.your-objectstorage.com/mtk-seamap/seamap.pmtiles`
 - **Format**: Vector tiles (PMTiles served via API)
 - **Max Zoom**: 14
 - **Layers**:
@@ -212,16 +216,19 @@ The [seamap.html](seamap.html) file provides a complete MapLibre GL JS demonstra
 
 #### 5. Bathymetry (EMODnet)
 - **Source**: MapToolkit Data Connector (EMODnet Bathymetry 2024)
-- **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.png`
+- **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.webp`
+- **Gebco Pmtiles Source**: `https://fsn1.your-objectstorage.com/mtk-seamap/emod.pmtiles`
+- **Emodnet Pmtiles Source**: `https://fsn1.your-objectstorage.com/mtk-seamap/gebco.pmtiles`
 - **Encoding**: Terrarium (RGB-encoded depth values)
-- **Max Zoom**: 11
-- **Coverage**: European waters
+- **Max Zoom**: 11 (9 for Gebco)
+- **Coverage**: European waters (worldwide for Gebco)
 - **Features**:
   - Bathymetric hillshading (0.2 exaggeration)
   - Dynamically generated depth contours
   - Contour lines at: 0m, 2m, 5m, 10m, 20m, 50m, 100m, 250m, 500m, 1000m, 2000m, 3000m, 4000m, 5000m
   - Depth area fills: 0-2m, 2-5m, 5-10m, 10-20m, 20-50m
   - Spot soundings (depth labels) with 32-pixel grid spacing
+  - All Contour/Bathymetry/Spotsounding features a created ondemand in the browser via the [maplibre-contours](https://github.com/prozessor13/maplibre-contour) plugin
 
 ### Technology Stack
 
