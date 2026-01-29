@@ -149,7 +149,7 @@ java -Xmx4g -cp planetiler.jar:. Seamap \
 Or for a local OSM file:
 ```bash
 java -Xmx4g -cp planetiler.jar:. Seamap \
-  --osm-path=data/austria.osm.pbf \
+  --osm-path=data/croatia.osm.pbf \
   --output=seamarks.pmtiles \
   --force
 ```
