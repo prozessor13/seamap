@@ -7,7 +7,7 @@
 This Java file implements a Planetiler profile that converts OpenStreetMap data directly into PMTiles vector tiles for nautical charts.
 Additionally all Bathymetry/Contours/Spotsoundings are rendered ondemand via a pached version of the [maplibre-contour](https://github.com/prozessor13/maplibre-contour) plugin.
 
-To simplify installation there is a (in very alpha stage) signalk-plugin to allow partial downloads of all map source for offline-usage.
+To simplify installation there is a (in beta state) [signalk-seamap-plugin](https://github.com/prozessor13/signalk-seamap-plugin) to allow partial downloads of all map source for offline-usage.
 
 ## Features
 
