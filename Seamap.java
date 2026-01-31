@@ -7,7 +7,9 @@ import com.onthegomap.planetiler.reader.SourceFeature;
 import com.onthegomap.planetiler.FeatureCollector;
 import com.onthegomap.planetiler.config.Arguments;
 import com.onthegomap.planetiler.geo.GeometryType;
+import com.onthegomap.planetiler.geo.TileCoord;
 import com.onthegomap.planetiler.util.LanguageUtils;
+import com.onthegomap.planetiler.VectorTile;
 import org.locationtech.jts.geom.*;
 
 /**
@@ -40,7 +42,13 @@ public class Seamap implements Profile {
     String area = arguments.getString("area", "geofabrik area to download", "monaco");
     Path dataDir = Path.of("data");
 
-    Seamark.depthCalculator = new DepthCalculator(dataDir.resolve("depth.pmtiles"));
+    // Initialize depth calculator only if --depth parameter is provided
+    String depthPath = arguments.getString("depth", "path to depth.pmtiles file", null);
+    if (depthPath != null) {
+      System.out.println("Loading depth data from: " + depthPath);
+      Seamark.depthCalculator = new DepthCalculator(Path.of(depthPath));
+      System.out.println("Depth data loaded successfully");
+    }
 
     Planetiler.create(arguments)
       .setProfile(new Seamap())
@@ -63,81 +71,56 @@ public class Seamap implements Profile {
       return;
     }
 
-    // Process seamarks from OSM
+    // Extract large water bodies (lakes, reservoirs) from OSM
+    if ("osm".equals(sf.getSource()) && !sf.isPoint()) {
+      var tags = sf.tags();
+      String natural = (String) tags.get("natural");
+      String water = (String) tags.get("water");
+
+      if ("water".equals(natural) && (sf.canBePolygon() || sf.canBeLine())) {
+        // Add water body to separate layer
+        FeatureCollector.Feature waterFeature = features.anyGeometry("water");
+        waterFeature.setAttr("type", water != null ? water : "unknown");
+        if (tags.containsKey("name")) {
+          waterFeature.setAttr("name", tags.get("name"));
+        }
+        waterFeature.setMinZoom(4); // Adjust based on size/importance
+      }
+    }
+
+    // Process seamarks
     Map<String, Object> attrs = Seamark.extractSeamarkAttributes(sf);
     String type = (String) attrs.get("type");
+    String category = (String) attrs.get("category");
     if (type != null) {
-      boolean isLightMajor = type.equals("light_major");
-      boolean isLightMinor = type.equals("light_minor");
-      boolean isSeparationZone = type.startsWith("separation_");
-      boolean isPlatform = type.equals("platform");
-      boolean isSafeWater = type.contains("_safe_water");
-      boolean isIsoltedDanger = type.contains("_isolated_danger");
-      boolean isCardinal = type.contains("_cardinal");
-      boolean isFogSignal = type.equals("fog_signal");
-      boolean isRestricted = Arrays.asList(
-        "anchorage",
-        "cable_area",
-        "fairway",
-        "inshore_traffic_zone",
-        "marine_farm",
-        "military_area",
-        "protected_area",
-        "restricted_area",
-        "production_area",
-        "pipeline_area",
-        "precautionary_area",
-        "seaplane_landing_area",
-        "submarine_transit_lane"
-      ).contains(type);
-
       // add seamark to vector tile
       attrs.put("osm_id", sf.id());
       FeatureCollector.Feature feature = features.anyGeometry("seamark");
       attrs.forEach((k, v) -> feature.setAttr(k, v));
-
-      // Set zoom range based on type:
-      if (isLightMajor || isLightMinor || isSeparationZone || isRestricted || isPlatform || isFogSignal) {
-        feature.setMinZoom(4);
-      } else if (isSafeWater || isIsoltedDanger || isCardinal) {
-        feature.setMinZoom(6);
-      } else {
-        feature.setMinZoom(8);
-      }
+      feature.setMinZoom(SeamarkZoomRules.getMinZoom(attrs));
 
       // create label-grid for rocks, sorted by danger level
       if (type.equals("rock")) {
-        String category = (String) attrs.get("category");
+        String rockCategory = (String) attrs.get("category");
         int depth = attrs.get("depth") != null ? Math.round(((Number) attrs.get("depth")).floatValue()) : 0;
         int rank;
-        if ("submerged".equals(category)) {
-          rank = 0; // Most dangerous: always underwater, invisible
-        } else if ("awash".equals(category)) {
-          rank = 10000; // Very dangerous: at wave height, barely visible
-        } else if ("covers".equals(category)) {
-          rank = 20000; // Dangerous: periodically submerged
-        } else {
-          rank = 30000; // Least dangerous: always visible (dry, always_dry, or no water_level)
-        }
+        if ("submerged".equals(rockCategory)) rank = 0; // Most dangerous: always underwater, invisible
+        else if ("awash".equals(rockCategory)) rank = 10000; // Very dangerous: at wave height, barely visible
+        else if ("covers".equals(rockCategory)) rank = 20000; // Dangerous: periodically submerged
+        else rank = 30000; // Least dangerous: always visible (dry, always_dry, or no water_level)
         feature.setSortKey(rank + depth).setPointLabelGridSizeAndLimit(12, 32, 4);
       }
 
       // create label-grid for wrecks, sorted by danger level
       if (type.equals("wreck")) {
-        String category = (String) attrs.get("category");
+        String wreckCategory = (String) attrs.get("category");
         int depth = attrs.get("depth") != null ? Math.round(((Number) attrs.get("depth")).floatValue()) : 0;
         int rank;
-        if ("dangerous".equals(category)) {
-          rank = 0; // Most dangerous: dangerous to surface navigation
-        } else if ("mast_showing".equals(category)) {
-          rank = 10000; // Very dangerous: mast visible
-        } else if ("hull_showing".equals(category)) {
-          rank = 20000; // Dangerous: hull or superstructure visible
-        } else if ("distributed_remains".equals(category)) {
-          rank = 30000; // Moderately dangerous: foul ground
-        } else {
-          rank = 40000; // Least dangerous: non-dangerous or unspecified
-        }
+        if ("dangerous".equals(wreckCategory)) rank = 0; // Most dangerous: dangerous to surface navigation
+        else if ("mast_showing".equals(wreckCategory)) rank = 10000; // Very dangerous: mast visible
+        else if ("hull_showing".equals(wreckCategory)) rank = 20000; // Dangerous: hull or superstructure visible
+        else if ("distributed_remains".equals(wreckCategory)) rank = 30000; // Moderately dangerous: foul ground
+        else rank = 40000; // Least dangerous: non-dangerous or unspecified
         feature.setSortKey(rank + depth).setPointLabelGridSizeAndLimit(12, 16, 1);
       }
 
@@ -150,19 +133,69 @@ public class Seamap implements Profile {
             lightFeature.setAttr("osm_id", sf.id());
             lightFeature.setAttr("type", type);
             lightGeom.attrs.forEach((k, v) -> lightFeature.setAttr(k, v));
-
-            // Light sectors follow the same zoom logic as their parent seamark
-            if (isLightMajor || isLightMinor) {
-              lightFeature.setMinZoom(6);
-            } else {
-              lightFeature.setMinZoom(8);
-            }
+            lightFeature.setMinZoom(SeamarkZoomRules.getLightMinZoom(type));
           }
         } catch (Exception e) {
           System.err.println("Error generating light geometries for OSM ID " + sf.id() + ": " + e);
         }
       }
     }
+  }
+
+  // Temporarily disabled - may cause performance issues
+  // @Override
+  public Map<String, List<VectorTile.Feature>> postProcessTileFeatures(TileCoord tileCoord, Map<String, List<VectorTile.Feature>> layers) {
+    List<VectorTile.Feature> landFeatures = layers.get("land");
+    List<VectorTile.Feature> waterFeatures = layers.get("water");
+
+    if (landFeatures != null && !landFeatures.isEmpty()) {
+      try {
+        // 1. Union all land geometries
+        Geometry allLand = null;
+        for (VectorTile.Feature landFeature : landFeatures) {
+          Geometry geom = landFeature.geometry().decode();
+          if (allLand == null) {
+            allLand = geom;
+          } else {
+            allLand = allLand.union(geom);
+          }
+        }
+
+        // 2. Union all water geometries
+        Geometry allWater = null;
+        if (waterFeatures != null && !waterFeatures.isEmpty()) {
+          for (VectorTile.Feature waterFeature : waterFeatures) {
+            Geometry geom = waterFeature.geometry().decode();
+            if (allWater == null) {
+              allWater = geom;
+            } else {
+              allWater = allWater.union(geom);
+            }
+          }
+        }
+
+        // 3. Subtract water from land
+        if (allLand != null && allWater != null) {
+          allLand = allLand.difference(allWater);
+        }
+
+        // 4. Replace land layer with modified land
+        if (allLand != null && !allLand.isEmpty()) {
+          Map<String, Object> attrs = new HashMap<>();
+          VectorTile.Feature newLandFeature = new VectorTile.Feature("land", 1, VectorTile.encodeGeometry(allLand), attrs);
+          layers.put("land", List.of(newLandFeature));
+        }
+
+        // 5. Remove water layer
+        layers.remove("water");
+
+      } catch (Exception e) {
+        // Geometry operation failed, keep original layers
+        System.err.println("Error in postProcessTileFeatures for tile " + tileCoord + ": " + e.getMessage());
+      }
+    }
+
+    return layers;
   }
 
 }

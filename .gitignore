@@ -1,3 +1,6 @@
 *.class
 data
 planetiler.jar
+stuff/
+k8s/
+jar/

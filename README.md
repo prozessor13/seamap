@@ -5,9 +5,9 @@
 
 ## Overview
 This Java file implements a Planetiler profile that converts OpenStreetMap data directly into PMTiles vector tiles for nautical charts.
-Additionally all Bathymetry/Contours/Spotsoundings are rendered ondemand via a pached version of the [maplibre-contour](https://github.com/prozessor13/maplibre-contour) plugin.
+Additionally, in the Demopage, all Bathymetry/Contours/Spotsoundings are rendered ondemand via a patched version of the [maplibre-contour](https://github.com/prozessor13/maplibre-contour) plugin.
 
-To simplify installation there is a (in very alpha stage) signalk-plugin to allow partial downloads of all map source for offline-usage.
+For offline usage on boats, the [SignalK Seamap Plugin](https://github.com/prozessor13/signalk-seamap-plugin) provides intelligent map tile caching with multi-tier retrieval: filesystem cache (7-day retention), offline PMTiles sectors (~350km² coverage at zoom 6), and online fallback via HTTP range requests. Supports vector tiles (OSM, Seamap) and raster bathymetry (GEBCO, EMOD) with serverside dynamic contour and bathymetry generation.
 
 ## Features
 
@@ -44,6 +44,7 @@ Maps standard OSM tags to seamark types:
 - Projection: WGS84 (EPSG:4326)
 - Automatic download on first run if not present
 - Creates `land` layer with polygon features
+- **Water bodies (natural=water) are automatically cut out from land polygons** via tile post-processing to allow bathymetry rendering for lakes, reservoirs, and inland waterways (e.g., IJsselmeer, Bodensee)
 - Attributes: None (simple land mask geometry)
 - Buffer: 4 pixels for smooth rendering at tile boundaries
 
@@ -124,33 +125,57 @@ Replicates SQL `seamark_light_abbr()` function:
 
 ## Usage
 
-### Download Planetiler
+### Required Dependencies
 
-Download the latest [Planetiler](https://github.com/onthegomap/planetiler):
+Download the required JAR files into a `jar/` directory:
 
 ```bash
+mkdir -p jar
+cd jar
+
+# Planetiler (main dependency)
 wget https://github.com/onthegomap/planetiler/releases/latest/download/planetiler.jar
-```
 
-### Compile
-```bash
-javac -cp planetiler.jar *.java
+# WebP support for image processing
+wget https://repo1.maven.org/maven2/com/github/gotson/webp-imageio/0.3.0/webp-imageio-0.3.0.jar -O imageio-webp.jar
+wget https://repo1.maven.org/maven2/com/twelvemonkeys/imageio/imageio-core/3.11.0/imageio-core-3.11.0.jar -O imageio-core.jar
+
+# Apache Commons utilities
+wget https://repo1.maven.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.jar -O common-io.jar
+wget https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.14.0/commons-lang3-3.14.0.jar -O common-lang.jar
+
+cd ..
 ```
 
 ### Run
+
+Basic usage (downloads OSM data from Geofabrik):
 ```bash
-java -Xmx4g -cp planetiler.jar:. Seamap \
-  --download \
+java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-core.jar:./jar/common-lang.jar:./jar/common-io.jar Seamap.java \
   --area=croatia \
-  --output=seamarks.pmtiles \
   --force
 ```
 
-Or for a local OSM file:
+**With depth data** for automatic depth calculation on rocks and wrecks:
 ```bash
-java -Xmx4g -cp planetiler.jar:. Seamap \
-  --osm-path=data/austria.osm.pbf \
-  --output=seamarks.pmtiles \
+java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-core.jar:./jar/common-lang.jar:./jar/common-io.jar Seamap.java \
+  --area=croatia \
+  --depth=data/depth.pmtiles \
+  --force
+```
+
+The `--depth` parameter accepts a PMTiles file with bathymetry data (Terrarium-encoded). Download GEBCO bathymetry:
+```bash
+mkdir -p data
+wget https://fsn1.your-objectstorage.com/mtk-seamap/gebco.pmtiles -O data/depth.pmtiles
+```
+
+**Memory optimization for large areas** (e.g., Germany):
+```bash
+java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-core.jar:./jar/common-lang.jar:./jar/common-io.jar Seamap.java \
+  --area=germany \
+  --storage=mmap \
+  --nodemap-type=array \
   --force
 ```
 
@@ -176,8 +201,6 @@ java -Xmx4g -cp planetiler.jar:. Seamap \
 
 **Note:** Polygon features also generate a corresponding point feature for labeling (using point on surface).
 
-
-
 ## Build PMTiles file for the whole planet
 
 This command takes about 1h on a strong hetzner machine (Ryzen 9 & 128 GB RAM)
@@ -188,7 +211,7 @@ This command takes about 1h on a strong hetzner machine (Ryzen 9 & 128 GB RAM)
 
 The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/-5.3433) file provides a complete MapLibre GL JS demonstration of the nautical chart visualization.
 
-### Data Sources
+### Data Sources for the Demopage
 
 #### 1. Base Map
 - **Provider**: [VersaTiles](https://tiles.versatiles.org)

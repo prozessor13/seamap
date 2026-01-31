@@ -24,8 +24,10 @@ public class Seamark {
       attrs.put("type", type);
       attrs.put("name", coalesce(seamarkValue(tags, type, "name"), value(tags, "seamark:name"), value(tags, "name")));
       attrs.put("reference", coalesce(seamarkValue(tags, type, "reference"), value(tags, "seamark:reference"), value(tags, "reference")));
-      attrs.put("function", coalesce(seamarkValue(tags, type, "function"), value(tags, "seamark:function"), value(tags, "function")));
       attrs.put("category", getSeamarkCategory(tags, type));
+      attrs.put("restriction", coalesce(seamarkValue(tags, type, "restriction"), value(tags, "seamark:restriction"), value(tags, "restriction")));
+      attrs.put("function", coalesce(seamarkValue(tags, type, "function"), value(tags, "seamark:function"), value(tags, "function")));
+      attrs.put("water_level", coalesce(seamarkValue(tags, type, "water_level"), value(tags, "seamark:water_level"), value(tags, "water_level")));
       attrs.put("shape", seamarkValue(tags, type, "shape"));
       attrs.put("color", replaceSemiWithUnderscore(seamarkValue(tags, type, "colour")));
       attrs.put("color_pattern", seamarkValue(tags, type, "colour_pattern"));
@@ -57,9 +59,38 @@ public class Seamark {
       attrs.put("category", value(tags, "substance"));
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
+    } else if ("offshore_platform".equals(value(tags, "man_made"))) {
+      attrs.put("type", "platform");
+      attrs.put("category", "offshore_platform");
+      attrs.put("name", value(tags, "name"));
+      attrs.put("reference", value(tags, "ref"));
     } else if ("pier".equals(value(tags, "man_made"))) {
-      attrs.put("type", "mooring");
+      attrs.put("type", "shoreline_construction");
       attrs.put("category", "pier");
+      attrs.put("name", value(tags, "name"));
+      attrs.put("reference", value(tags, "ref"));
+    } else if ("groyne".equals(value(tags, "man_made"))) {
+      attrs.put("type", "shoreline_construction");
+      attrs.put("category", "groyne");
+      attrs.put("name", value(tags, "name"));
+      attrs.put("reference", value(tags, "ref"));
+    } else if ("breakwater".equals(value(tags, "man_made"))) {
+      attrs.put("type", "shoreline_construction");
+      attrs.put("category", "breakwater");
+      attrs.put("name", value(tags, "name"));
+      attrs.put("reference", value(tags, "ref"));
+    } else if ("water_tap".equals(value(tags, "man_made"))) {
+      attrs.put("type", "small_craft_facility");
+      attrs.put("category", "drinking_water");
+      attrs.put("name", value(tags, "name"));
+      attrs.put("reference", value(tags, "ref"));
+    } else if ("slipway".equals(value(tags, "leisure"))) {
+      attrs.put("type", "small_craft_facility");
+      attrs.put("category", "slipway");
+      attrs.put("name", value(tags, "name"));
+      attrs.put("reference", value(tags, "ref"));
+    } else if ("wreck".equals(value(tags, "historic"))) {
+      attrs.put("type", "wreck");
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
     } else if ("marina".equals(value(tags, "leisure")) && (sf.canBeLine() || sf.canBePolygon())) {
@@ -75,6 +106,7 @@ public class Seamark {
     } else if (sf.isPoint() && ("tower".equals(value(tags, "man_made")) || "windmill".equals(value(tags, "man_made")) || "gasometer".equals(value(tags, "man_made")))) {
       attrs.put("type", "landmark");
       attrs.put("category", value(tags, "man_made"));
+      attrs.put("function", value(tags, value(tags, "man_made") + ":type"));
       attrs.put("name", value(tags, "name"));
       attrs.put("reference", value(tags, "ref"));
     }
@@ -237,22 +269,10 @@ public class Seamark {
 
   // Based on https://wiki.openstreetmap.org/wiki/Seamarks/Seamark_Objects
   private static String getSeamarkCategory(Map<String, Object> tags, String type) {
-    if ("rock".equals(type)) {
-      return seamarkValue(tags, "rock", "water_level");
-    } else if ("restricted_area".equals(type)) {
-      return coalesce(
-        seamarkValue(tags, "restricted_area", "category"),
-        seamarkValue(tags, "restricted_area", "restriction")
-      );
-    } else if ("seabed_area".equals(type)) {
-      return seamarkValue(tags, "seabed_area", "surface");
-    } else if ("obstruction".equals(type)) {
-      return coalesce(
-        seamarkValue(tags, "obstruction", "category"),
-        seamarkValue(tags, "obstruction", "water_level")
-      );
+    if ("seabed_area".equals(type)) {
+      return seamarkValue(tags, type, "surface");
     } else if ("wreck".equals(type)) {
-      String category = seamarkValue(tags, "wreck", "category");
+      String category = seamarkValue(tags, type, "category");
       if (category == null) { // Fallback: derive category from water_level if category is not set
         String waterLevel = seamarkValue(tags, "wreck", "water_level");
         if ("submerged".equals(waterLevel) || "awash".equals(waterLevel) || "covers".equals(waterLevel)) {
@@ -262,22 +282,13 @@ public class Seamark {
         }
       }
       return category;
-    } else if ("cable_submarine".equals(type)) {
-      return seamarkValue(tags, "cable_submarine", "category");
     } else if ("pipeline_submarine".equals(type)) {
       return coalesce(
         seamarkValue(tags, "pipeline_submarine", "category"),
         seamarkValue(tags, "pipeline_submarine", "product")
       );
-    } else if ("landmark".equals(type)) {
-      return coalesce(
-        seamarkValue(tags, "landmark", "category"),
-        seamarkValue(tags, "landmark", "function")
-      );
-    } else if ("building".equals(type)) {
-      return seamarkValue(tags, "building", "function");
     } else {
-      return seamarkValue(tags, type, "category");
+      return coalesce(seamarkValue(tags, type, "category"), value(tags, "seamark:category"), value(tags, "category"));
     }
   }
 
