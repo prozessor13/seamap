@@ -220,7 +220,7 @@ The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/
 
 #### 2. Seamark Vector Tiles
 - **Source**: MapToolkit Data Connector
-- **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf`
+- **Tile Endpoint**: `https://dataconnector.maptoolkit.net/seamap/seamap/{z}/{x}/{y}.pbf?api_key=seamap`
 - **Pmtiles Source**: `https://fsn1.your-objectstorage.com/mtk-seamap/seamap.pmtiles`
 - **Format**: Vector tiles (PMTiles served via API)
 - **Max Zoom**: 14
@@ -237,7 +237,7 @@ The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/
 
 #### 4. Land Hillshading & Contours
 - **Provider**: [Mapterhorn](https://tiles.mapterhorn.com)
-- **Endpoint**: `https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`
+- **Tile Endpoint**: `https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`
 - **Encoding**: Terrarium (RGB-encoded elevation)
 - **Max Zoom**: 12
 - **Features**:
@@ -247,7 +247,7 @@ The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/
 
 #### 5. Bathymetry (EMODnet)
 - **Source**: MapToolkit Data Connector (EMODnet Bathymetry 2024)
-- **Endpoint**: `https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.webp`
+- **Tile Endpoint**: `https://dataconnector.maptoolkit.net/seamap/emod/{z}/{x}/{y}.webp?api_key=seamap`
 - **Gebco Pmtiles Source**: `https://fsn1.your-objectstorage.com/mtk-seamap/emod.pmtiles`
 - **Emodnet Pmtiles Source**: `https://fsn1.your-objectstorage.com/mtk-seamap/gebco.pmtiles`
 - **Encoding**: Terrarium (RGB-encoded depth values)
@@ -266,6 +266,7 @@ The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/
 - **MapLibre GL JS**: Open-source map rendering engine
 - **maplibre-contour** (v0.2.8): Plugin for dynamic contour generation from DEM tiles
 - **VersaTiles Style**: Base map styling library
+- **Maptoolkit Servers**: Serve Seamap and bathymetry tiles
 
 ### Features Rendered
 
@@ -331,6 +332,6 @@ gdal_fillnodata.py -md 5 merged.tif filled.tif
 This command takes about 10h on a strong Hetzner machine
 
 ```
-rio rgbify -v -e terrarium --min-z 3 --max-z 11 -r -2 -j 4 --format webp filled_clipped.vrt emod.mbtiles
+rio rgbify -v -e terrarium --min-z 3 --max-z 11 -r -2 -j 4 --format webp filled.tif emod.mbtiles
 pmtiles convert emod.mbtiles emod.pmtiles
 ```
