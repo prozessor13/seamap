@@ -134,15 +134,15 @@ mkdir -p jar
 cd jar
 
 # Planetiler (main dependency)
-wget https://github.com/onthegomap/planetiler/releases/latest/download/planetiler.jar
+wget https://github.com/onthegomap/planetiler/releases/download/v0.9.3/planetiler.jar
 
-# WebP support for image processing
-wget https://repo1.maven.org/maven2/com/github/gotson/webp-imageio/0.3.0/webp-imageio-0.3.0.jar -O imageio-webp.jar
-wget https://repo1.maven.org/maven2/com/twelvemonkeys/imageio/imageio-core/3.11.0/imageio-core-3.11.0.jar -O imageio-core.jar
+# TwelveMonkeys ImageIO WebP support
+wget https://repo1.maven.org/maven2/com/twelvemonkeys/imageio/imageio-webp/3.10.1/imageio-webp-3.10.1.jar -O imageio-webp.jar
+wget https://repo1.maven.org/maven2/com/twelvemonkeys/imageio/imageio-core/3.10.1/imageio-core-3.10.1.jar -O imageio-core.jar
 
-# Apache Commons utilities
-wget https://repo1.maven.org/maven2/commons-io/commons-io/2.16.1/commons-io-2.16.1.jar -O common-io.jar
-wget https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.14.0/commons-lang3-3.14.0.jar -O common-lang.jar
+# TwelveMonkeys Common utilities
+wget https://repo1.maven.org/maven2/com/twelvemonkeys/common/common-io/3.10.1/common-io-3.10.1.jar -O common-io.jar
+wget https://repo1.maven.org/maven2/com/twelvemonkeys/common/common-lang/3.10.1/common-lang-3.10.1.jar -O common-lang.jar
 
 cd ..
 ```
