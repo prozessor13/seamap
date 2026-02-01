@@ -77,9 +77,9 @@ public class Seamap implements Profile {
       String natural = (String) tags.get("natural");
       String water = (String) tags.get("water");
 
-      if ("water".equals(natural) && (sf.canBePolygon() || sf.canBeLine())) {
+      if ("water".equals(natural) && sf.canBePolygon()) {
         // Add water body to separate layer
-        FeatureCollector.Feature waterFeature = features.anyGeometry("water");
+        FeatureCollector.Feature waterFeature = features.polygon("water");
         waterFeature.setAttr("type", water != null ? water : "unknown");
         if (tags.containsKey("name")) {
           waterFeature.setAttr("name", tags.get("name"));
