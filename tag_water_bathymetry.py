@@ -18,16 +18,26 @@ from shapely.validation import make_valid
 
 
 def process_chunk(args):
-    """Process water polygons, return OSM IDs with bathymetry."""
-    chunk_data, tid_path, threshold, min_area = args
+    """Process water polygons from a chunk range, return OSM IDs with bathymetry."""
+    water_path, start_idx, chunk_size, tid_path, threshold, min_area, bbox = args
 
     tid = rasterio.open(tid_path)
     bounds = tid.bounds
 
     ids_with_bathy = []
 
-    for row in chunk_data.itertuples():
+    # Read only the chunk we need using row slicing
+    gdf = gpd.read_file(water_path, rows=slice(start_idx, start_idx + chunk_size))
+
+    # Apply bbox filter if specified
+    if bbox:
+        minx, miny, maxx, maxy = bbox
+        gdf = gdf.cx[minx:maxx, miny:maxy]
+
+    processed = 0
+    for idx, row in gdf.iterrows():
         geom = row.geometry
+
         if geom is None or geom.is_empty or geom.area < min_area:
             continue
 
@@ -35,6 +45,10 @@ def process_chunk(args):
             geom = make_valid(geom)
             if geom.is_empty:
                 continue
+
+        processed += 1
+        if processed % 1000 == 0:
+            print(f"Worker processing feature {processed} (offset {start_idx})", flush=True)
 
         b = geom.bounds
 
@@ -72,13 +86,16 @@ def process_chunk(args):
         ratio = len(real_data) / len(pixels)
 
         if ratio >= threshold:
-            osm_id = row.osm_id if hasattr(row, 'osm_id') else row.Index
-            try:
-                ids_with_bathy.append(int(osm_id))
-            except (ValueError, TypeError):
-                pass  # Skip NaN or invalid IDs
+            # Extract OSM ID
+            osm_id = row.get('osm_id')
+            if osm_id is not None:
+                try:
+                    ids_with_bathy.append(int(osm_id))
+                except (ValueError, TypeError):
+                    pass  # Skip NaN or invalid IDs
 
     tid.close()
+    print(f"Worker finished: {len(ids_with_bathy)} IDs with bathymetry from {processed} features", flush=True)
     return ids_with_bathy
 
 
@@ -91,6 +108,8 @@ def main():
     parser.add_argument('--min-area', type=float, default=0.00005)
     parser.add_argument('--workers', type=int, default=cpu_count())
     parser.add_argument('--bbox', type=float, nargs=4, default=None)
+    parser.add_argument('--chunk-size', type=int, default=10000,
+                       help='Number of features per chunk (default: 10000)')
 
     args = parser.parse_args()
 
@@ -98,33 +117,47 @@ def main():
         print("Error: Input files not found")
         return
 
-    water = gpd.read_file(args.water)
+    # Count total features using geopandas
+    print("Counting features...")
+    # Read without geometry for faster counting
+    gdf_count = gpd.read_file(args.water, ignore_geometry=True)
+    total_features = len(gdf_count)
+    del gdf_count  # Free memory
 
-    if 'osm_id' not in water.columns:
-        water['osm_id'] = water.index
+    print(f"Total features in GPKG: {total_features}")
+    print(f"Chunk size: {args.chunk_size}")
+    print(f"Workers: {args.workers}")
 
-    if args.bbox:
-        minx, miny, maxx, maxy = args.bbox
-        water = water.cx[minx:maxx, miny:maxy]
+    # Create chunk ranges (start_idx, chunk_size)
+    chunk_args = []
+    for start_idx in range(0, total_features, args.chunk_size):
+        actual_chunk_size = min(args.chunk_size, total_features - start_idx)
+        chunk_args.append((
+            args.water,
+            start_idx,
+            actual_chunk_size,
+            args.tid,
+            args.threshold,
+            args.min_area,
+            args.bbox
+        ))
 
-    # Split into chunks
-    chunk_size = max(1, len(water) // args.workers)
-    chunks = [water.iloc[i:i+chunk_size] for i in range(0, len(water), chunk_size)]
-    chunk_args = [(chunk, args.tid, args.threshold, args.min_area)
-                  for chunk in chunks if len(chunk) > 0]
+    print(f"Created {len(chunk_args)} chunks")
 
-    # Process
+    # Process chunks in parallel
     all_ids = []
     with Pool(args.workers) as pool:
-        for result in pool.imap_unordered(process_chunk, chunk_args):
+        for i, result in enumerate(pool.imap_unordered(process_chunk, chunk_args)):
             all_ids.extend(result)
+            print(f"Completed chunk {i+1}/{len(chunk_args)}, total IDs so far: {len(all_ids)}", flush=True)
 
     # Write output
+    unique_ids = sorted(set(all_ids))
     with open(args.output, 'w') as f:
-        for osm_id in sorted(set(all_ids)):
+        for osm_id in unique_ids:
             f.write(f"{osm_id}\n")
 
-    print(f"Wrote {len(all_ids)} IDs to {args.output}")
+    print(f"Wrote {len(unique_ids)} unique IDs to {args.output}")
 
 
 if __name__ == '__main__':
