@@ -1,6 +1,7 @@
 import java.util.*;
 import java.util.regex.*;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import com.onthegomap.planetiler.Planetiler;
 import com.onthegomap.planetiler.Profile;
 import com.onthegomap.planetiler.reader.SourceFeature;
@@ -37,6 +38,8 @@ import org.locationtech.jts.geom.*;
  */
 public class Seamap implements Profile {
 
+  private Set<Long> bathymetryWaterIds = new HashSet<>();
+
   public static void main(String[] args) throws Exception {
     var arguments = Arguments.fromArgsOrConfigFile(args).withDefault("download", true);
     String area = arguments.getString("area", "geofabrik area to download", "monaco");
@@ -50,12 +53,33 @@ public class Seamap implements Profile {
       System.out.println("Depth data loaded successfully");
     }
 
+    Seamap profile = new Seamap();
+    profile.loadBathymetryIds();
+
     Planetiler.create(arguments)
-      .setProfile(new Seamap())
+      .setProfile(profile)
       .addOsmSource("osm", dataDir.resolve(area + ".osm.pbf"), "geofabrik:" + area)
       .addShapefileSource("land", LandPolygons.ensureLandPolygons(dataDir))
       .overwriteOutput(dataDir.resolve("seamarks.pmtiles"))
       .run();
+  }
+
+  private void loadBathymetryIds() {
+    Path idFile = Path.of("water_with_bathymetry.txt");
+    if (Files.exists(idFile)) {
+      try {
+        Files.lines(idFile)
+          .map(String::trim)
+          .filter(line -> !line.isEmpty())
+          .mapToLong(Long::parseLong)
+          .forEach(bathymetryWaterIds::add);
+        System.out.println("Loaded " + bathymetryWaterIds.size() + " water IDs with bathymetry");
+      } catch (Exception e) {
+        System.err.println("Could not load bathymetry water IDs: " + e.getMessage());
+      }
+    } else {
+      System.err.println("WARNING: water_with_bathymetry.txt not found, all water will be treated as no-bathymetry");
+    }
   }
 
   @Override
@@ -78,9 +102,16 @@ public class Seamap implements Profile {
       String water = (String) tags.get("water");
 
       if ("water".equals(natural) && sf.canBePolygon()) {
+        boolean hasBathy = bathymetryWaterIds.contains(sf.id());
+
         // Add water body to separate layer
         FeatureCollector.Feature waterFeature = features.polygon("water");
-        waterFeature.setAttr("type", water != null ? water : "unknown");
+        // Only set type if it's not "unknown"
+        if (water != null) {
+          waterFeature.setAttr("water", water);
+        }
+        // Store has_bathymetry internally for postProcessing, but don't export it to tiles
+        waterFeature.setAttr("has_bathymetry", hasBathy);
         if (tags.containsKey("name")) {
           waterFeature.setAttr("name", tags.get("name"));
         }
@@ -161,20 +192,24 @@ public class Seamap implements Profile {
           }
         }
 
-        // 2. Union all water geometries
+        // 2. Union all water geometries that have bathymetry
         Geometry allWater = null;
         if (waterFeatures != null && !waterFeatures.isEmpty()) {
           for (VectorTile.Feature waterFeature : waterFeatures) {
-            Geometry geom = waterFeature.geometry().decode();
-            if (allWater == null) {
-              allWater = geom;
-            } else {
-              allWater = allWater.union(geom);
+            Object hasBathy = waterFeature.tags().get("has_bathymetry");
+            // Only cut out water bodies that have bathymetry data
+            if (hasBathy != null && (Boolean) hasBathy) {
+              Geometry geom = waterFeature.geometry().decode();
+              if (allWater == null) {
+                allWater = geom;
+              } else {
+                allWater = allWater.union(geom);
+              }
             }
           }
         }
 
-        // 3. Subtract water from land
+        // 3. Subtract water with bathymetry from land
         if (allLand != null && allWater != null) {
           allLand = allLand.difference(allWater);
         }
@@ -186,8 +221,31 @@ public class Seamap implements Profile {
           layers.put("land", List.of(newLandFeature));
         }
 
-        // 5. Remove water layer
-        layers.remove("water");
+        // 5. Keep water layer with only non-bathymetry features, remove internal attributes
+        if (waterFeatures != null && !waterFeatures.isEmpty()) {
+          List<VectorTile.Feature> nonBathyWater = new ArrayList<>();
+          for (VectorTile.Feature waterFeature : waterFeatures) {
+            Object hasBathy = waterFeature.tags().get("has_bathymetry");
+            // Keep water features without bathymetry in the water layer
+            if (hasBathy == null || !(Boolean) hasBathy) {
+              // Remove has_bathymetry attribute before adding to output
+              Map<String, Object> cleanAttrs = new HashMap<>(waterFeature.tags());
+              cleanAttrs.remove("has_bathymetry");
+              VectorTile.Feature cleanFeature = new VectorTile.Feature(
+                waterFeature.layer(),
+                waterFeature.id(),
+                waterFeature.geometry(),
+                cleanAttrs
+              );
+              nonBathyWater.add(cleanFeature);
+            }
+          }
+          if (!nonBathyWater.isEmpty()) {
+            layers.put("water", nonBathyWater);
+          } else {
+            layers.remove("water");
+          }
+        }
 
       } catch (Exception e) {
         // Geometry operation failed, keep original layers

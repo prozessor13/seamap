@@ -38,15 +38,33 @@ Maps standard OSM tags to seamark types:
 | `man_made=tower\|windmill\|gasometer` | `landmark` | `man_made` | point |
 | `man_made=lighthouse` | `lighthouse` | - | point (with full light attributes) |
 
-### 3. Land Layer
+### 3. Land and Water Layer
+
+#### Land Layer
 - Downloads and processes global land polygons from [osmdata.openstreetmap.de](https://osmdata.openstreetmap.de/data/land-polygons.html)
 - Source: `land-polygons-split-4326.zip` (~600 MB)
 - Projection: WGS84 (EPSG:4326)
 - Automatic download on first run if not present
 - Creates `land` layer with polygon features
-- **Water bodies (natural=water) are automatically cut out from land polygons** via tile post-processing to allow bathymetry rendering for lakes, reservoirs, and inland waterways (e.g., IJsselmeer, Bodensee)
 - Attributes: None (simple land mask geometry)
 - Buffer: 4 pixels for smooth rendering at tile boundaries
+
+#### Water Layer
+- Extracts water bodies from OSM (`natural=water`)
+- **Intelligent bathymetry handling**: Water polygons are classified based on whether they have real bathymetric survey data (using GEBCO TID grid)
+- **Water WITH bathymetry** (e.g., IJsselmeer, Bodensee, coastal lagoons):
+  - Cut out from land polygons via tile post-processing
+  - Allows bathymetry rendering beneath the water surface
+  - Not included in final `water` layer
+- **Water WITHOUT bathymetry** (e.g., small inland lakes, ponds):
+  - Kept in `water` layer for normal blue water rendering
+  - Prevents green interpolation artifacts from missing bathymetry data
+  - Attributes: `name`, `water` (type: lake, reservoir, pond, etc.)
+
+This approach ensures that:
+- Large navigable waters with hydrographic surveys show detailed bathymetry
+- Small inland waters without surveys render as standard blue water features
+- No confusing green "depth 0" areas appear where no real bathymetry data exists
 
 ### 4. Light Sector Layer
 Generates geometric representations of light sectors for navigational lights:
@@ -278,6 +296,90 @@ The demo visualizes:
 - **Navigation**: Traffic separation schemes, fairways, anchorages
 - **Hazards**: Rocks, wrecks with appropriate symbols
 - **Infrastructure**: Cables, pipelines, platforms, landmarks
+
+## Generate Bathymetry Water ID List (Optional)
+
+To enable intelligent water/bathymetry handling, you need to generate a list of OSM water IDs that have real bathymetric survey data. This is done by analyzing the GEBCO TID (Type Identifier) grid, which indicates data source types.
+
+### Prerequisites
+
+Install Python dependencies:
+```bash
+pip install geopandas rasterio numpy shapely fiona
+```
+
+### Step 1: Download GEBCO TID Grid
+
+```bash
+# Download GEBCO 2024 TID grid (~90 MB compressed, 4 GB uncompressed)
+wget https://www.bodc.ac.uk/data/open_download/gebco/gebco_2024_tid/zip/ -O gebco_2024_tid.zip
+unzip gebco_2024_tid.zip
+
+# Convert NetCDF to tiled GeoTIFF (CRITICAL for performance)
+gdal_translate -of GTiff \
+  -co TILED=YES -co BLOCKXSIZE=512 -co BLOCKYSIZE=512 \
+  -co COMPRESS=LZW \
+  NETCDF:"GEBCO_2024_TID.nc":tid \
+  gebco_tid_tiled.tif
+```
+
+### Step 2: Extract OSM Water Polygons
+
+```bash
+osmium tags-filter your-area.osm.pbf \
+  wr/natural=water wr/water wr/landuse=reservoir \
+  -o water_filtered.osm.pbf
+
+ogr2ogr -f GPKG osm_water.gpkg water_filtered.osm.pbf \
+  -sql "SELECT osm_id FROM multipolygons"
+```
+
+### Step 3: Run Bathymetry Tagging Script
+
+```bash
+python3 tag_water_bathymetry.py \
+  --water osm_water.gpkg \
+  --tid gebco_tid_tiled.tif \
+  --output water_with_bathymetry.txt \
+  --workers 8
+```
+
+**Parameters:**
+- `--threshold 0.2` - Minimum ratio (20%) of real bathymetry data required (default)
+- `--min-area 0.00005` - Minimum polygon area in degrees² (~500m², filters small features)
+- `--workers 8` - Number of parallel processing threads
+
+**GEBCO TID Values:**
+- `0` = Land/interpolated (no real data)
+- `10` = Predicted (satellite altimetry)
+- `11-15` = Direct measurements (multibeam, singlebeam, etc.)
+- `40-44` = Mixed sources
+- `70-74` = Auto-generated / crowd-sourced
+- Any value `!= 0` indicates some kind of bathymetric data source exists
+
+**Output:**
+- `water_with_bathymetry.txt` - OSM IDs (one per line) for water features with real bathymetry data
+- Place this file in the same directory as `Seamap.java` before running the tile generation
+
+### Expected Results
+
+Water bodies that **SHOULD** have bathymetry (will be cut from land):
+- IJsselmeer, Markermeer (Netherlands)
+- Loch Ness, Lake Geneva (major lakes)
+- Lagune von Venedig (coastal lagoons)
+- Large navigable reservoirs and inland seas
+
+Water bodies that **SHOULD NOT** have bathymetry (will render as blue water):
+- Small unnamed lakes in forests
+- Ornamental ponds and water features
+- Polder lakes without surveys (Netherlands)
+- Random small reservoirs
+
+### Maintenance
+
+Regenerate `water_with_bathymetry.txt` when:
+- Updating to a new GEBCO release (annually, typically July)
+- Processing a new OSM extract or planet file
 
 ## Create EMODnet Bathymetry
 
