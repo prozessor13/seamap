@@ -38,6 +38,7 @@ public class Seamark {
       attrs.put("light_sequence", coalesce(seamarkValue(tags, "light", "sequence"), seamarkValue(tags, "light", "1:sequence")));
       attrs.put("light_category", coalesce(seamarkValue(tags, "light", "category"), seamarkValue(tags, "light", "1:category")));
       attrs.put("topmark_color", replaceSemiWithUnderscore(coalesce(seamarkValue(tags, "topmark", "colour"), seamarkValue(tags, "daymark", "colour"))));
+      attrs.put("topmark_color_pattern", replaceSemiWithUnderscore(coalesce(seamarkValue(tags, "topmark", "colour_pattern"))));
       attrs.put("topmark_shape", sanitizeTopmarkShape(coalesce(seamarkValue(tags, "topmark", "shape"), seamarkValue(tags, "daymark", "shape"))));
       attrs.put("depth", Parse.parseDoubleOrNull(coalesce(seamarkValue(tags, type, "depth"), value(tags, "seamark:depth"), value(tags, "depth"))));
       attrs.put("minimum_depth", Parse.parseDoubleOrNull(coalesce(seamarkValue(tags, type, "minimum_depth"), value(tags, "seamark:minimum_depth"), value(tags, "minimum_depth"))));
