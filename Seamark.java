@@ -31,9 +31,12 @@ public class Seamark {
       attrs.put("shape", seamarkValue(tags, type, "shape"));
       attrs.put("color", replaceSemiWithUnderscore(seamarkValue(tags, type, "colour")));
       attrs.put("color_pattern", seamarkValue(tags, type, "colour_pattern"));
+      attrs.put("fog_signal", seamarkValue(tags, "fog_signal", "category"));
+      attrs.put("radar_reflector", radarReflector(tags, type));
       attrs.put("light", seamarkLightAbbr(tags));
       attrs.put("light_color", coalesce(seamarkValue(tags, "light", "colour"), seamarkValue(tags, "light", "1:colour")));
       attrs.put("light_sequence", coalesce(seamarkValue(tags, "light", "sequence"), seamarkValue(tags, "light", "1:sequence")));
+      attrs.put("light_category", coalesce(seamarkValue(tags, "light", "category"), seamarkValue(tags, "light", "1:category")));
       attrs.put("topmark_color", replaceSemiWithUnderscore(coalesce(seamarkValue(tags, "topmark", "colour"), seamarkValue(tags, "daymark", "colour"))));
       attrs.put("topmark_shape", sanitizeTopmarkShape(coalesce(seamarkValue(tags, "topmark", "shape"), seamarkValue(tags, "daymark", "shape"))));
       attrs.put("depth", Parse.parseDoubleOrNull(coalesce(seamarkValue(tags, type, "depth"), value(tags, "seamark:depth"), value(tags, "depth"))));
@@ -213,6 +216,21 @@ public class Seamark {
     String out = v.replace(",", "");
     out = out.replace(" ", "_");
     return out;
+  }
+
+  private static String radarReflector(Map<String,Object> tags, String type) {
+    String reflector = value(tags, "seamark:radar_reflector");
+    String reflectivity = seamarkValue(tags, type, "reflectivity");
+    String transponder = seamarkValue(tags, "radar_transponder", "category");
+    if ("yes".equals(reflector)) {
+      return "yes";
+    } else if ("conspicuous".equals(reflectivity) || "reflector".equals(reflectivity)) {
+      return reflectivity;
+    } else if (transponder != null) {
+      return transponder;
+    } else {
+      return null;
+    }
   }
 
   private static String seamarkLightAbbr(Map<String,Object> tags) {

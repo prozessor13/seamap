@@ -106,7 +106,7 @@ def main():
     parser.add_argument('--output', default='water_with_bathymetry.txt')
     parser.add_argument('--threshold', type=float, default=0.2)
     parser.add_argument('--min-area', type=float, default=0.00005)
-    parser.add_argument('--workers', type=int, default=cpu_count())
+    parser.add_argument('--workers', type=int, default=min(8, cpu_count()))
     parser.add_argument('--bbox', type=float, nargs=4, default=None)
     parser.add_argument('--chunk-size', type=int, default=10000,
                        help='Number of features per chunk (default: 10000)')

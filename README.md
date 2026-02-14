@@ -305,7 +305,7 @@ To enable intelligent water/bathymetry handling, you need to generate a list of 
 
 Install Python dependencies:
 ```bash
-pip install geopandas rasterio numpy shapely fiona
+pip install geopandas rasterio shapely fiona
 ```
 
 ### Step 1: Download GEBCO TID Grid
@@ -326,7 +326,7 @@ gdal_translate -of GTiff \
 ### Step 2: Extract OSM Water Polygons
 
 ```bash
-osmium tags-filter your-area.osm.pbf \
+osmium tags-filter planet-latest.osm.pbf \
   wr/natural=water wr/water wr/landuse=reservoir \
   -o water_filtered.osm.pbf
 
