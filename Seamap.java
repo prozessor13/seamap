@@ -156,7 +156,7 @@ public class Seamap implements Profile {
       }
 
       // add labels for small polygons in low zoomlevels
-      if ("harbour".equals(type) && !sf.isPoint()) {
+      if ("harbour".equals(type) || "landmark".equals(type) || "light_major".equals(type) || "light_minor".equals(type)&& !sf.isPoint()) {
         FeatureCollector.Feature labelFeature = sf.canBePolygon()
           ? features.pointOnSurface("seamark")
           : features.centroid("seamark");
