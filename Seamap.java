@@ -155,6 +155,16 @@ public class Seamap implements Profile {
         feature.setSortKey(rank + depth).setPointLabelGridSizeAndLimit(12, 16, 1);
       }
 
+      // add labels for small polygons in low zoomlevels
+      if ("harbour".equals(type) && !sf.isPoint()) {
+        FeatureCollector.Feature labelFeature = sf.canBePolygon()
+          ? features.pointOnSurface("seamark")
+          : features.centroid("seamark");
+        attrs.forEach((k, v) -> labelFeature.setAttr(k, v));
+        labelFeature.setAttr("osm_id", sf.id());
+        labelFeature.setMinZoom(SeamarkZoomRules.getMinZoom(attrs));
+      }
+
       // add sector-lights (Arcs und Rays) to vector tile
       if (sf.tags().containsKey("seamark:light:1:colour")) {
         try {

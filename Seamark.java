@@ -33,6 +33,8 @@ public class Seamark {
       attrs.put("color_pattern", seamarkValue(tags, type, "colour_pattern"));
       attrs.put("fog_signal", seamarkValue(tags, "fog_signal", "category"));
       attrs.put("radar_reflector", radarReflector(tags, type));
+      attrs.put("radio_station", collectTags(tags, "radio_station"));
+      attrs.put("seabed_surface", seamarkValue(tags, "seabed_area", "surface"));
       attrs.put("light", seamarkLightAbbr(tags));
       attrs.put("light_color", coalesce(seamarkValue(tags, "light", "colour"), seamarkValue(tags, "light", "1:colour")));
       attrs.put("light_sequence", coalesce(seamarkValue(tags, "light", "sequence"), seamarkValue(tags, "light", "1:sequence")));
@@ -232,6 +234,21 @@ public class Seamark {
     } else {
       return null;
     }
+  }
+
+  private static String collectTags(Map<String,Object> tags, String group) {
+    StringBuilder sb = new StringBuilder();
+    String prefix = "seamark:" + group + ":";
+    for (Map.Entry<String,Object> e : tags.entrySet()) {
+      if (e.getKey().startsWith(prefix) && e.getValue() != null) {
+        String attr = e.getKey().substring(prefix.length());
+        String val = e.getValue().toString();
+        if (!val.isEmpty()) {
+          sb.append(attr).append(":").append(val).append(",");
+        }
+      }
+    }
+    return sb.length() > 0 ? sb.toString() : null;
   }
 
   private static String seamarkLightAbbr(Map<String,Object> tags) {
