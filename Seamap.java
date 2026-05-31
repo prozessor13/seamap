@@ -183,87 +183,75 @@ public class Seamap implements Profile {
     }
   }
 
-  // Temporarily disabled - may cause performance issues
-  // @Override
+  @Override
   public Map<String, List<VectorTile.Feature>> postProcessTileFeatures(TileCoord tileCoord, Map<String, List<VectorTile.Feature>> layers) {
     List<VectorTile.Feature> landFeatures = layers.get("land");
     List<VectorTile.Feature> waterFeatures = layers.get("water");
 
     if (landFeatures != null && !landFeatures.isEmpty()) {
       try {
-        // 1. Union all land geometries
-        Geometry allLand = null;
-        for (VectorTile.Feature landFeature : landFeatures) {
-          Geometry geom = landFeature.geometry().decode();
-          if (allLand == null) {
-            allLand = geom;
-          } else {
-            allLand = allLand.union(geom);
-          }
-        }
+        Geometry allLand = unionGeometries(landFeatures, f -> true);
+        Geometry allWater = waterFeatures == null ? null : unionGeometries(waterFeatures, f -> {
+          Object hasBathy = f.tags().get("has_bathymetry");
+          return hasBathy != null && (Boolean) hasBathy;
+        });
 
-        // 2. Union all water geometries that have bathymetry
-        Geometry allWater = null;
-        if (waterFeatures != null && !waterFeatures.isEmpty()) {
-          for (VectorTile.Feature waterFeature : waterFeatures) {
-            Object hasBathy = waterFeature.tags().get("has_bathymetry");
-            // Only cut out water bodies that have bathymetry data
-            if (hasBathy != null && (Boolean) hasBathy) {
-              Geometry geom = waterFeature.geometry().decode();
-              if (allWater == null) {
-                allWater = geom;
-              } else {
-                allWater = allWater.union(geom);
-              }
-            }
-          }
-        }
-
-        // 3. Subtract water with bathymetry from land
         if (allLand != null && allWater != null) {
           allLand = allLand.difference(allWater);
         }
 
-        // 4. Replace land layer with modified land
-        if (allLand != null && !allLand.isEmpty()) {
+        // Replace land layer with the cut result. If the result is empty
+        // (water fully covers land in this tile), drop the layer so the
+        // bathymetry beneath shows through.
+        if (allLand == null || allLand.isEmpty()) {
+          layers.remove("land");
+        } else {
           Map<String, Object> attrs = new HashMap<>();
           VectorTile.Feature newLandFeature = new VectorTile.Feature("land", 1, VectorTile.encodeGeometry(allLand), attrs);
           layers.put("land", List.of(newLandFeature));
         }
-
-        // 5. Keep water layer with only non-bathymetry features, remove internal attributes
-        if (waterFeatures != null && !waterFeatures.isEmpty()) {
-          List<VectorTile.Feature> nonBathyWater = new ArrayList<>();
-          for (VectorTile.Feature waterFeature : waterFeatures) {
-            Object hasBathy = waterFeature.tags().get("has_bathymetry");
-            // Keep water features without bathymetry in the water layer
-            if (hasBathy == null || !(Boolean) hasBathy) {
-              // Remove has_bathymetry attribute before adding to output
-              Map<String, Object> cleanAttrs = new HashMap<>(waterFeature.tags());
-              cleanAttrs.remove("has_bathymetry");
-              VectorTile.Feature cleanFeature = new VectorTile.Feature(
-                waterFeature.layer(),
-                waterFeature.id(),
-                waterFeature.geometry(),
-                cleanAttrs
-              );
-              nonBathyWater.add(cleanFeature);
-            }
-          }
-          if (!nonBathyWater.isEmpty()) {
-            layers.put("water", nonBathyWater);
-          } else {
-            layers.remove("water");
-          }
-        }
-
       } catch (Exception e) {
-        // Geometry operation failed, keep original layers
-        System.err.println("Error in postProcessTileFeatures for tile " + tileCoord + ": " + e.getMessage());
+        System.err.println("Error cutting water from land for tile " + tileCoord + ": " + e.getMessage());
+      }
+    }
+
+    // Water cleanup runs regardless of land presence: bathymetry-tagged water
+    // is dropped from output, non-bathymetry water is kept with the internal
+    // attribute stripped.
+    if (waterFeatures != null && !waterFeatures.isEmpty()) {
+      List<VectorTile.Feature> nonBathyWater = new ArrayList<>();
+      for (VectorTile.Feature waterFeature : waterFeatures) {
+        Object hasBathy = waterFeature.tags().get("has_bathymetry");
+        if (hasBathy == null || !(Boolean) hasBathy) {
+          Map<String, Object> cleanAttrs = new HashMap<>(waterFeature.tags());
+          cleanAttrs.remove("has_bathymetry");
+          nonBathyWater.add(new VectorTile.Feature(
+            waterFeature.layer(),
+            waterFeature.id(),
+            waterFeature.geometry(),
+            cleanAttrs
+          ));
+        }
+      }
+      if (nonBathyWater.isEmpty()) {
+        layers.remove("water");
+      } else {
+        layers.put("water", nonBathyWater);
       }
     }
 
     return layers;
+  }
+
+  private static Geometry unionGeometries(List<VectorTile.Feature> features, java.util.function.Predicate<VectorTile.Feature> include)
+      throws com.onthegomap.planetiler.geo.GeometryException {
+    Geometry result = null;
+    for (VectorTile.Feature f : features) {
+      if (!include.test(f)) continue;
+      Geometry geom = f.geometry().decode();
+      result = result == null ? geom : result.union(geom);
+    }
+    return result;
   }
 
 }
