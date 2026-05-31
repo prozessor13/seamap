@@ -117,6 +117,53 @@ public class Seamap implements Profile {
         }
         waterFeature.setMinZoom(4); // Adjust based on size/importance
       }
+
+      // Extract wetland / intertidal areas relevant for navigation:
+      // tidal flats ("Wattenmeer"), salt marshes, mud and shoals that fall
+      // dry between high and low water. These lie in the intertidal zone
+      // below the coastline, so they are rendered on top of water/bathymetry
+      // and are NOT cut out of the land polygons.
+      String wetland = (String) tags.get("wetland");
+      boolean isWetland = "wetland".equals(natural) ||
+        "mud".equals(natural) || "shoal".equals(natural);
+      if (isWetland && sf.canBePolygon()) {
+        FeatureCollector.Feature wetlandFeature = features.polygon("wetland");
+        wetlandFeature.setAttr("type", "wetland");
+
+        // category describes what kind of intertidal/wetland area it is
+        // (e.g. "tidalflat", "saltmarsh", "mud", "shoal")
+        String wetlandCategory = wetland != null ? wetland : natural;
+        wetlandFeature.setAttr("category", wetlandCategory);
+
+        if (tags.get("surface") != null) {
+          wetlandFeature.setAttr("surface", tags.get("surface"));
+        }
+        if (tags.containsKey("name")) {
+          wetlandFeature.setAttr("name", tags.get("name"));
+        }
+        wetlandFeature.setMinZoom(7).setBufferPixels(4);
+      }
+
+      // Extract waterways (canals, rivers, fairways, ...) as linestrings.
+      // Navigable waterways are the most relevant; minor ditches/drains are
+      // kept but only appear at higher zoom levels.
+      String waterway = (String) tags.get("waterway");
+      if (waterway != null && sf.canBeLine()) {
+        FeatureCollector.Feature waterwayFeature = features.line("waterway");
+        waterwayFeature.setAttr("type", "waterway");
+        waterwayFeature.setAttr("category", waterway);
+        if (tags.containsKey("name")) {
+          waterwayFeature.setAttr("name", tags.get("name"));
+        }
+
+        // major navigable waterways appear earlier than minor ones
+        int minZoom = switch (waterway) {
+          case "river", "canal", "fairway" -> 8;
+          case "stream", "tidal_channel", "lock", "dock" -> 11;
+          default -> 13; // drain, ditch, etc.
+        };
+        waterwayFeature.setMinZoom(minZoom).setBufferPixels(4);
+      }
     }
 
     // Process seamarks
