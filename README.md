@@ -143,43 +143,25 @@ Replicates SQL `seamark_light_abbr()` function:
 
 ## Usage
 
-### Required Dependencies
+### Setup
 
-Download the required JAR files into a `jar/` directory:
+Requires Java 21+ (the Gradle wrapper handles everything else; `mise install`
+provisions a matching toolchain if you use mise). Resolve dependencies and compile:
 
 ```bash
-mkdir -p jar
-cd jar
-
-# Planetiler (main dependency)
-wget https://github.com/onthegomap/planetiler/releases/download/v0.9.3/planetiler.jar
-
-# TwelveMonkeys ImageIO WebP support
-wget https://repo1.maven.org/maven2/com/twelvemonkeys/imageio/imageio-webp/3.10.1/imageio-webp-3.10.1.jar -O imageio-webp.jar
-wget https://repo1.maven.org/maven2/com/twelvemonkeys/imageio/imageio-core/3.10.1/imageio-core-3.10.1.jar -O imageio-core.jar
-
-# TwelveMonkeys Common utilities
-wget https://repo1.maven.org/maven2/com/twelvemonkeys/common/common-io/3.10.1/common-io-3.10.1.jar -O common-io.jar
-wget https://repo1.maven.org/maven2/com/twelvemonkeys/common/common-lang/3.10.1/common-lang-3.10.1.jar -O common-lang.jar
-
-cd ..
+bin/setup
 ```
 
 ### Run
 
 Basic usage (downloads OSM data from Geofabrik):
 ```bash
-java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-core.jar:./jar/common-lang.jar:./jar/common-io.jar Seamap.java \
-  --area=croatia \
-  --force
+bin/run --area=croatia --force
 ```
 
 **With depth data** for automatic depth calculation on rocks and wrecks:
 ```bash
-java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-core.jar:./jar/common-lang.jar:./jar/common-io.jar Seamap.java \
-  --area=croatia \
-  --depth=data/depth.pmtiles \
-  --force
+bin/run --area=croatia --depth=data/depth.pmtiles --force
 ```
 
 The `--depth` parameter accepts a PMTiles file with bathymetry data (Terrarium-encoded). Download GEBCO bathymetry:
@@ -190,11 +172,7 @@ wget https://fsn1.your-objectstorage.com/mtk-seamap/gebco.pmtiles -O data/depth.
 
 **Memory optimization for large areas** (e.g., Germany):
 ```bash
-java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-core.jar:./jar/common-lang.jar:./jar/common-io.jar Seamap.java \
-  --area=germany \
-  --storage=mmap \
-  --nodemap-type=array \
-  --force
+bin/run --area=germany --storage=mmap --nodemap-type=array --force
 ```
 
 ## Output Layers
@@ -221,9 +199,23 @@ java -Xmx12g -cp .:./jar/planetiler.jar:./jar/imageio-webp.jar:./jar/imageio-cor
 
 ## Build PMTiles file for the whole planet
 
-This command takes about 1h on a strong hetzner machine (Ryzen 9 & 128 GB RAM)
+This command takes about 1h on a strong hetzner machine (Ryzen 9 & 128 GB RAM).
+The output is written to `data/seamarks.pmtiles`.
 
-    java -Xmx20g   -XX:+UseParallelGC   -XX:ParallelGCThreads=4   -cp "/app/classes:/app/libs/*:/app/resources:."   Seamap.java   --download   --osm-url=https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf   --maxzoom=14  --output=/data/seamap.pmtiles   --tmp=/data/tmp   --nodemap-type=array   --storage=mmap   --threads=20   --download-threads=10   --http-retries=3   --force
+```bash
+JAVA_OPTS="-Xmx20g -XX:+UseParallelGC -XX:ParallelGCThreads=4" \
+  bin/run \
+  --download \
+  --osm-url=https://planet.openstreetmap.org/pbf/planet-latest.osm.pbf \
+  --maxzoom=14 \
+  --tmp=/data/tmp \
+  --nodemap-type=array \
+  --storage=mmap \
+  --threads=20 \
+  --download-threads=10 \
+  --http-retries=3 \
+  --force
+```
 
 ## Demo Page (seamap.html)
 
