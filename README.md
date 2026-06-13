@@ -437,3 +437,7 @@ This command takes about 10h on a strong Hetzner machine
 rio rgbify -v -e terrarium --min-z 3 --max-z 11 -r -2 -j 4 --format webp filled.tif emod.mbtiles
 pmtiles convert emod.mbtiles emod.pmtiles
 ```
+
+## License
+
+[MIT](LICENSE)
