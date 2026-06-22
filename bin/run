@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# Rebuild (incremental, fast when unchanged) then run.
+# Override heap per run, e.g. JAVA_OPTS=-Xmx20g bin/run --area=germany
+./gradlew installDist -q
+exec build/install/seamap/bin/seamap "$@"

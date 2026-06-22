@@ -5,7 +5,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.*;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.zip.ZipFile;
 import com.onthegomap.planetiler.reader.SourceFeature;
 import com.onthegomap.planetiler.FeatureCollector;
 
@@ -110,31 +110,25 @@ public class LandPolygons {
    * Extracts a zip file to a target directory.
    */
   private static void extractZipFile(Path zipFilePath, Path targetDir) throws IOException {
-    try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFilePath))) {
-      ZipEntry entry;
+    try (ZipFile zipFile = new ZipFile(zipFilePath.toFile())) {
+      var entries = zipFile.entries();
 
-      while ((entry = zis.getNextEntry()) != null) {
+      while (entries.hasMoreElements()) {
+        ZipEntry entry = entries.nextElement();
         Path entryPath = targetDir.resolve(entry.getName());
 
         if (entry.isDirectory()) {
           Files.createDirectories(entryPath);
         } else {
-          // Ensure parent directory exists
           Files.createDirectories(entryPath.getParent());
 
-          // Extract file
-          try (OutputStream out = Files.newOutputStream(entryPath)) {
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = zis.read(buffer)) != -1) {
-              out.write(buffer, 0, bytesRead);
-            }
+          try (InputStream in = zipFile.getInputStream(entry);
+               OutputStream out = Files.newOutputStream(entryPath)) {
+            in.transferTo(out);
           }
 
           System.out.println("Extracted: " + entry.getName());
         }
-
-        zis.closeEntry();
       }
     }
   }

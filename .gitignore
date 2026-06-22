@@ -4,6 +4,8 @@ planetiler.jar
 stuff/
 k8s/
 jar/
+out/
 .claude
 build/
+.gradle/
 tmp/

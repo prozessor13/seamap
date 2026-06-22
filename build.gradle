@@ -1,0 +1,28 @@
+plugins {
+  id 'application'
+}
+
+repositories {
+  mavenCentral()
+  // planetiler-core pulls GeoTools, which is published to OSGeo, not Maven Central.
+  maven { url = 'https://repo.osgeo.org/repository/release/' }
+}
+
+dependencies {
+  implementation 'com.onthegomap.planetiler:planetiler-core:0.9.3'
+  // WebP decoding for Terrarium DEM tiles (DepthCalculator). Registered via
+  // ServiceLoader at runtime, so not needed on the compile classpath.
+  runtimeOnly 'com.twelvemonkeys.imageio:imageio-webp:3.10.1'
+}
+
+java {
+  sourceCompatibility = JavaVersion.VERSION_21
+  targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+  mainClass = 'Seamap'
+  applicationName = 'seamap'
+  // Override per-run with JAVA_OPTS (e.g. JAVA_OPTS=-Xmx20g for a planet build).
+  applicationDefaultJvmArgs = ['-Xmx12g']
+}

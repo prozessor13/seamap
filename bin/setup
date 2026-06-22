@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# Resolve dependencies and compile. Gradle handles the rest.
+exec ./gradlew build

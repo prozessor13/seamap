@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Caches Gradle dependencies and wrapper between runs.
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Global land polygons (~600MB). Downloaded by the build on first run,
+      # then restored from cache. Static key: the dataset changes rarely and
+      # exact freshness doesn't matter for a smoke build.
+      - name: Cache land polygons
+        uses: actions/cache@v4
+        with:
+          path: data/land-polygons-split-4326
+          key: land-polygons-split-4326
+
+      # Fetch here with retries rather than relying on the build's own (no-retry)
+      # downloader, which is flaky against osmdata from CI runners. Skipped when
+      # the cache already restored the shapefile.
+      - name: Download land polygons
+        run: |
+          if [ ! -f data/land-polygons-split-4326/land_polygons.shp ]; then
+            mkdir -p data
+            curl -fSL --retry 5 --retry-all-errors --connect-timeout 30 \
+              -o /tmp/land.zip \
+              https://osmdata.openstreetmap.de/download/land-polygons-split-4326.zip
+            unzip -q /tmp/land.zip -d data
+          fi
+
+      - name: Compile
+        run: bin/setup
+
+      # Full smoke build: monaco OSM extract + global land layer, exercising
+      # the whole pipeline (download, shapefile read, postprocess, pmtiles write).
+      - name: Smoke build (monaco)
+        run: JAVA_OPTS=-Xmx8g bin/run --area=monaco --force
+
+      - name: Verify output
+        run: test -f data/seamarks.pmtiles
