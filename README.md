@@ -217,9 +217,19 @@ JAVA_OPTS="-Xmx20g -XX:+UseParallelGC -XX:ParallelGCThreads=4" \
   --force
 ```
 
-## Demo Page (seamap.html)
+## Viewer (`viewer/`)
 
-The [seamap.html](https://prozessor13.github.io/seamap/seamap.html#10.81/36.128/-5.3433) file provides a complete MapLibre GL JS demonstration of the nautical chart visualization.
+A MapLibre GL JS viewer for the nautical chart, built with Vite.
+
+```bash
+npm --prefix viewer install
+npm --prefix viewer run dev      # local dev server
+npm --prefix viewer run build    # static build → viewer/dist/
+```
+
+`maplibre-gl` and `@versatiles/style` are npm dependencies; the patched
+`maplibre-contour` (bathymetry contours/soundings) is vendored at
+`viewer/vendor/maplibre-contour.mjs` (see `viewer/vendor/README.md`).
 
 ### Data Sources for the Demopage
 

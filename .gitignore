@@ -9,3 +9,5 @@ out/
 build/
 .gradle/
 tmp/
+node_modules
+viewer/dist

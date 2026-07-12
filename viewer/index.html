@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+	<title>Seamap</title>
+	<style>
+		body { margin: 0; }
+		.bathymetry-control {
+			position: absolute;
+			top: 10px;
+			right: 10px;
+			background: white;
+			padding: 10px;
+			border-radius: 4px;
+			box-shadow: 0 0 0 2px rgba(0,0,0,.1);
+			font-family: 'Open Sans', sans-serif;
+			z-index: 1;
+		}
+		.bathymetry-control label {
+			display: block;
+			margin-bottom: 5px;
+			font-weight: bold;
+			font-size: 12px;
+		}
+		.bathymetry-control select {
+			width: 100%;
+			padding: 5px;
+			border: 1px solid #ccc;
+			border-radius: 3px;
+			font-size: 12px;
+			cursor: pointer;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="map" style="height: 100vh"></div>
+
+	<div class="bathymetry-control">
+		<label>Bathymetry:</label>
+		<select id="bathymetry-select">
+			<option value="emod" selected>EMODnet</option>
+			<option value="gebco">GEBCO</option>
+			<option value="ddm">DDM</option>
+		</select>
+	</div>
+
+	<script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
