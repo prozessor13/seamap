@@ -440,6 +440,17 @@ rio rgbify -v -e terrarium --min-z 3 --max-z 11 -r -2 -j 4 --format webp filled.
 pmtiles convert emod.mbtiles emod.pmtiles
 ```
 
+## Sprites
+
+**Directory**: `sprites/`
+
+Provides sprite sheets for map icons and symbols in MapLibre GL format.
+
+> **License:** The seamark icons in `sprites/freenauticalchart*` are derived from
+> [quantenschaum/mapping](https://github.com/quantenschaum/mapping/tree/a0639c25dd4f6e3a795a3510c3caee7bb151348f/icons)
+> and licensed under GPL-3.0 (see `sprites/LICENSE-freenauticalchart`). The MIT license
+> of this plugin does not apply to them.
+
 ## License
 
 This project's code is licensed under the [MIT License](LICENSE.md).
